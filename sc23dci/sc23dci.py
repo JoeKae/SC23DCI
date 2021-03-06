@@ -53,7 +53,7 @@ class SC23DCI:
     hotelMode = 0
     uptime = 0
     softwareVersion = 0
-    dateTime = 0
+    dateTime = datetime.now()
     UID = 0
     deviceType = 0
     ip = 0
@@ -64,7 +64,9 @@ class SC23DCI:
     name = 0
     wifi = []
     httpTimeout = 5
-    httpTimeoutRetryCount = 3
+    httpTimeoutRetryCount = 0
+    unknown = []
+    changeBacklog = []
 
     def __init__(self, ip: str):
         self.reqBaseurl = 'http://' + ip + '/api/v/1/'
@@ -74,34 +76,35 @@ class SC23DCI:
         ret = "SC23DCI\nsetPoint:{}\nworkingMode: {}\npowerState: {}\nfanSpeed: {}\nflapRotate: {}\ntimeplanMode: {}\
         \ntemperature: {}\nnightMode: {}\ntimerStatus: {}\nheatingDisabled: {}\ncoolingDisabled: {}\nhotelMode: {}\
         \nuptime: {} seconds\nsoftwareVersion: {}\ndateTime: {}\nUID: {}\ndeviceType: {}\nip: {}\nsubnet: {}\
-        \ngateway: {}\ndhcp: {}\nserial: {}\nname: {}\nSSIDs: {}\nMqttClient: {}\nMqttList: {}".format(
+        \ngateway: {}\ndhcp: {}\nserial: {}\nname: {}\nSSIDs: {}\nMqttClient: {}\nMqttList: {}\nunkown: {}\
+        \nbacklog: {}".format(
             self.setPoint, self.workingMode, self.powerState, self.fanSpeed, self.flapRotate, self.timeplanMode,
             self.temperature, self.nightMode, self.timerStatus, self.heatingDisabled, self.coolingDisabled,
             self.hotelMode, self.uptime, self.softwareVersion, self.dateTime.isoformat(), self.UID, self.deviceType,
             self.ip, self.subnet, self.gateway, self.dhcp, self.serial, self.name, self.wifi, self.mqttClient,
-            self.mqttList)
+            self.mqttList, self.unknown, self.changeBacklog)
         return ret
 
     # http section
     def httpGet(self, endpoint):
         retries = 0
-        while retries < self.httpTimeoutRetryCount:
+        while retries <= self.httpTimeoutRetryCount:
             try:
                 res = req.get(self.reqBaseurl + endpoint, timeout=self.httpTimeout)
                 if res.status_code != 200:
                     logger.error('GET {} {}'.format(endpoint, res.status_code))
                     # This means something went wrong.
                     raise ApiError('GET {} {}'.format(endpoint, res.status_code))
-                logger.debug("status: {}, response: {}", res.status_code, res.json())
+                # logger.debug("status: {}, response: {}", res.status_code, res.json())
                 return res.json()
             except:
-                logger.warning("Timeout on {}{}".format(self.reqBaseurl, endpoint))
+                logger.debug("Timeout on {}{}".format(self.reqBaseurl, endpoint))
                 retries += 1
-        logger.warning("Missed all timeout retries {}{}".format(self.reqBaseurl, endpoint))
+        logger.debug("Missed all timeout retries {}{}".format(self.reqBaseurl, endpoint))
 
     def httpPost(self, endpoint, data=None):
         retries = 0
-        while retries < self.httpTimeoutRetryCount:
+        while retries <= self.httpTimeoutRetryCount:
             try:
                 if data is not None:
                     res = req.post(self.reqBaseurl + endpoint, data=data, timeout=self.httpTimeout)
@@ -111,66 +114,85 @@ class SC23DCI:
                     logger.error('POST {} {}'.format(endpoint, res.status_code))
                     # This means something went wrong.
                     raise ApiError('POST {} {}'.format(endpoint, res.status_code))
-                logger.debug("status: {}, response: {}", res.status_code, res.json())
+                # logger.debug("status: {}, response: {}", res.status_code, res.json())
                 return res.json()
             except:
-                logger.warning("Timeout on POST {}{}, data: {}".format(self.reqBaseurl, endpoint, data))
+                logger.debug("Timeout on POST {}{}, data: {}".format(self.reqBaseurl, endpoint, data))
                 retries += 1
-        logger.warning("Missed all timeout retries {}{}, data: {}".format(self.reqBaseurl, endpoint, data))
+        logger.debug("Missed all timeout retries {}{}, data: {}".format(self.reqBaseurl, endpoint, data))
 
     def refresh(self):
+        self.unknown = []
         ret = self.httpGet('status')
-        if ret is None:
-            return
-        data = ret['RESULT']
-        self.softwareVersion = ret['sw']['V']
-        self.UID = ret['UID']
-        self.deviceType = ret['deviceType']
-        self.dateTime = datetime(
-            day=ret['time']['d'],
-            month=ret['time']['m'],
-            year=ret['time']['y'],
-            hour=ret['time']['h'],
-            minute=ret['time']['i']
-            )
-        self.ip = ret['net']['ip']
-        self.subnet = ret['net']['sub']
-        self.gateway = ret['net']['gw']
-        self.dhcp = ret['net']['dhcp']
-        self.serial = ret['setup']['serial']
-        self.name = ret['setup']['name']
-        self.setPoint = data['sp']  # Zieltemperatur
-        self.workingMode = data['wm']  # Modus: heating(0), cooling(1), dehumidification(3), fan_only(4), auto(5)
-        self.powerState = data['ps']  # Aus: 0, An: 1
-        self.fanSpeed = data['fs']  # Auto: 0, Geschwindigkeiten: 1-3
-        self.flapRotate = data['fr']  # Rotatieren: 0, Fest: 7
-        self.timeplanMode = data['cm']  # Aus: 0, An: 1
-        # a?
-        self.temperature = data['t']  # °C Integer
-        # cp?
-        self.nightMode = data['nm']  # Aus: 0, An: 1
-        # ns?
-        # cloudstatus?
-        # connectionstatus?
-        # cloudConfig?
-        self.timerStatus = data['timerStatus']  # Timer aktiv: 1, Timer inaktiv: 0
-        self.heatingDisabled = data['heatingDisabled']  # 0/1
-        self.coolingDisabled = data['coolingDisabled']  # 0/1
-        self.hotelMode = data['hotelMode']  # 0/1
-        # kl?
-        # heatingResistance?
-        # inputFlags?
-        # ncc?
-        # pwd?
-        # heap?
-        # ccv?
-        # cci?
-        # daynumber (weekday?)
-        self.uptime = data['uptime']  # seconds?
-        # uscm?
-        # lastRefresh (data x ms old?)
-        if self.mqttClient != 0 and len(self.mqttList) > 0:
-            self.mqttPublish()
+        if ret is not None:
+            data = ret['RESULT']
+            self.softwareVersion = ret['sw']['V']
+            self.UID = ret['UID']
+            self.deviceType = ret['deviceType']
+            self.dateTime = datetime(
+                day=ret['time']['d'],
+                month=ret['time']['m'],
+                year=ret['time']['y'],
+                hour=ret['time']['h'],
+                minute=ret['time']['i']
+                )
+            self.ip = ret['net']['ip']
+            self.subnet = ret['net']['sub']
+            self.gateway = ret['net']['gw']
+            self.dhcp = ret['net']['dhcp']
+            self.serial = ret['setup']['serial']
+            self.name = ret['setup']['name']
+            self.setPoint = data['sp']  # set temperature
+            self.workingMode = data['wm']  # mode: heating(0), cooling(1), dehumidification(3), fan_only(4), auto(5)
+            self.powerState = data['ps']  # off: 0, on: 1
+            self.fanSpeed = data['fs']  # Auto: 0, speeds: 1-3
+            self.flapRotate = data['fr']  # rotate: 0, fixed: 7
+            self.timeplanMode = data['cm']  # off: 0, on: 1
+            self.unknown.append({"a": data['a']})  # a?
+            self.temperature = data['t']  # room temperature °C (integer)
+            self.unknown.append({"cp": data['cp']})  # cp?
+            self.nightMode = data['nm']  # off: 0, on: 1
+            self.unknown.append({"ns": data['ns']})  # ns?
+            self.unknown.append({"cloudStatus": data['cloudStatus']})  # cloudstatus?
+            self.unknown.append({"connectionStatus": data['connectionStatus']})  # connectionstatus?
+            self.unknown.append({"cloudConfig": data['cloudConfig']})  # cloudConfig?
+            self.unknown.append({"cfg_lastWorkingMode": data['cfg_lastWorkingMode']})
+            self.timerStatus = data['timerStatus']  # Timer active: 1, Timer inactive: 0
+            self.heatingDisabled = data['heatingDisabled']  # 0/1
+            self.coolingDisabled = data['coolingDisabled']  # 0/1
+            self.hotelMode = data['hotelMode']  # off: 0, on: 1
+            self.unknown.append({"kl": data['kl']})  # kl?
+            self.unknown.append({"heatingResistance": data['heatingResistance']})  # heating with heating resistance  off: 0, on: 1
+            self.unknown.append({"inputFlags": data['inputFlags']})  # inputFlags?
+            self.unknown.append({"ncc": data['ncc']})  # ncc?
+            self.unknown.append({"pwd": data['pwd']})  # pwd?
+            self.unknown.append({"heap": data['heap']})  # heap (free or used? kbytes or bytes?)
+            self.unknown.append({"ccv": data['ccv']})  # ccv?
+            self.unknown.append({"cci": data['cci']})  # cci?
+            self.unknown.append({"daynumber": data['daynumber']})  # daynumber (weekday? Sa: 0, Su: ?, Mo: ?, Tu: ?, We: ?, Th: ?, Fr: ?)
+            self.uptime = data['uptime']  # uptime of wifi? seconds? intervals: 5
+            self.unknown.append({"uscm": data['uscm']})  # uscm?
+            self.unknown.append({"lastRefresh": data['lastRefresh']})  # lastRefresh (data x ms old?)
+
+            backlogs = self.changeBacklog
+            self.changeBacklog = []
+            for backlog in backlogs:
+                if data[backlog['key']] != backlog['value']:
+                    if backlog['arg'] is None:
+                        backlog['func']()
+                    else:
+                        backlog['func'](backlog['arg'])
+
+            if self.mqttClient != 0 and len(self.mqttList) > 0:
+                self.mqttPublish()
+        # logger.debug(self)
+
+    def addBacklog(self, func, arg, key, value):
+        backlogs = self.changeBacklog
+        for backlog in backlogs:
+            if backlog['func'] == func:
+                self.changeBacklog.remove(backlog)
+        self.changeBacklog.append({'func': func, 'arg': arg, 'key': key, 'value': value})
 
     def clearSSIDs(self):
         self.wifi = []
@@ -193,29 +215,36 @@ class SC23DCI:
         return self.wifi
 
     def switchOn(self):
+        self.addBacklog(self.switchOn, None, 'ps', 1)
         ret = self.httpPost('power/on')
 
     def switchOff(self):
+        self.addBacklog(self.switchOff, None, 'ps', 0)
         ret = self.httpPost('power/off')
 
     def setTemperature(self, setPoint):
-        setPoint = max(min(setPoint, 31), 16)
-        ret = self.httpPost('set/setpoint', {'p_temp': round(setPoint)})
+        setPoint = round(max(min(setPoint, 31), 16))
+        self.addBacklog(self.setTemperature, setPoint, 'sp', setPoint)
+        ret = self.httpPost('set/setpoint', {'p_temp': setPoint})
 
     def setFanSpeed(self, speed):
         speed = max(min(speed, 3), 0)
+        self.addBacklog(self.setFanSpeed, speed, 'fs', speed)
         ret = self.httpPost('set/fan', {'value': speed})
 
     def setFlapRotation(self, rotate):
         mode = 0 if rotate else 7
+        self.addBacklog(self.setFlapRotation, rotate, 'fr', mode)
         ret = self.httpPost('set/feature/rotation', {'value': mode})
 
     def setNightMode(self, night):
         mode = 1 if night else 0
+        self.addBacklog(self.setNightMode, night, 'nm', mode)
         ret = self.httpPost('set/feature/night', {'value': mode})
 
     def setTimeplanMode(self, mode):
         endpoint = 'on' if mode else 'off'
+        self.addBacklog(self.setTimeplanMode, mode, 'cm', (1 if mode else 0))
         ret = self.httpPost('set/calendar/' + endpoint)
 
     def setWorkingMode(self, mode):
@@ -223,6 +252,7 @@ class SC23DCI:
             logger.warning("{} not allowed. heating:0, cooling:1, dehumidification:3, fan_only:4, auto:5", mode)
             return
         endpoint = ['heating', 'cooling', '', 'dehumidification', 'fanonly', 'auto']
+        self.addBacklog(self.setWorkingMode, mode, 'wm', mode)
         ret = self.httpPost('set/mode/' + endpoint[mode])
 
     def setModeAuto(self):
@@ -338,12 +368,9 @@ class SC23DCI:
             self.switchOff()
         else:
             self.switchOn()
-        self.refresh()
 
     def onMqttMode(self, client, userdata, msg):
         self.setWorkingMode(int(float(msg.payload)))
-        self.refresh()
 
     def onMqttSetpoint(self, client, userdata, msg):
         self.setTemperature(int(float(msg.payload)))
-        self.refresh()
