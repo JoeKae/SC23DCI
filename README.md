@@ -1,5 +1,6 @@
 # SC23DCI
 SC23DCI AC MQTT agent
+Works with Devices like this one: https://www.frico.net/fileadmin/user_upload/frico/Pdf/cat_frico_soloclim_de.pdf
 
 ## Setup
 
