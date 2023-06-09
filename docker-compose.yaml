@@ -1,0 +1,11 @@
+---
+version: "3"
+
+services:
+  sc23dci-agent:
+    container_name: sc23dci
+    restart: always
+#    build: ./
+    image: cheerio123/sc23dci:v1.0
+    env_file: .env.private.file
+
