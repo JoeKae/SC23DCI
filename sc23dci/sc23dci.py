@@ -1,61 +1,74 @@
-# encoding=utf8
-from time import sleep
-from datetime import datetime
-from loguru import logger
-import requests as req
-import paho.mqtt.client as mqtt
+"""
+SC23DCI Module
+Used for R/W access to the SC23DCI device and subscribe/publish to mqtt
+"""
 import json
+import time
+from datetime import datetime
+from time import sleep
+
+import paho.mqtt.client as mqtt
+import requests as req
+from loguru import logger
 
 
 class ApiError(Exception):
+    """
+    Custom Exception for SC23DCI API errors
+    """
     def __init__(self, status):
         self.status = status
 
     def __str__(self):
-        return "ApiError: status={}".format(self.status)
+        return f"ApiError: status={self.status}"
 
 
 class Wifi:
-    essid = "",
-    signal = 0,
+    """
+    Represents Wi-Fi config of the SC23DCI device
+    """
+    essid = ""
+    signal = 0
     password = True
 
     def __init__(self, wifi):
         self.essid = wifi['essid']
         self.signal = wifi['signal']
-        self.password = (wifi['password'] == 'true')
+        self.password = wifi['password'] == 'true'
 
     def __eq__(self, other):
         if hasattr(other, 'essid'):
             return self.essid == other.essid
-        else:
-            return self.essid == other['essid']
+        return self.essid == other['essid']
 
     def __repr__(self):
-        return "(SSID: {}, Signal: {}, Password: {})".format(self.essid, self.signal, self.password)
+        return f"(SSID: {self.essid}, Signal: {self.signal}, Password: {self.password})"
 
 
 class SC23DCI:
-    mqttClient = 0
-    mqttList = []
-    reqBaseurl = 0
-    setPoint = 0
-    workingMode = 0
-    powerState = 0
-    fanSpeed = 0
-    flapRotate = 0
-    timeplanMode = 0
+    """
+    Handles all the SC23DCI API polling and MQTT sub/pub
+    """
+    mqtt_client = 0
+    mqtt_list = []
+    req_base_url = 0
+    set_point = 0
+    working_mode = 0
+    power_state = 0
+    fan_speed = 0
+    flap_rotate = 0
+    timeplan_mode = 0
     temperature = 0
-    nightMode = 0
-    timerStatus = 0
-    heatingDisabled = 0
-    coolingDisabled = 0
-    hotelMode = 0
+    night_mode = 0
+    timer_status = 0
+    heating_disabled = 0
+    cooling_disabled = 0
+    hotel_mode = 0
     uptime = 0
-    softwareVersion = 0
-    dateTime = datetime.now()
-    UID = 0
-    deviceType = 0
+    software_version = 0
+    date_time = datetime.now()
+    uid = 0
+    device_type = 0
     ip = 0
     subnet = 0
     gateway = 0
@@ -63,73 +76,118 @@ class SC23DCI:
     serial = 0
     name = 0
     wifi = []
-    httpTimeout = 5
-    httpTimeoutRetryCount = 0
+    http_timeout = 5
+    http_timeout_retry_count = 0
     unknown = []
-    changeBacklog = []
+    change_backlog = []
 
     def __init__(self, ip: str):
-        self.reqBaseurl = 'http://' + ip + '/api/v/1/'
+        self.req_base_url = f"http://{ip}/api/v/1/"
         self.refresh()
 
     def __repr__(self):
-        ret = "SC23DCI\nsetPoint:{}\nworkingMode: {}\npowerState: {}\nfanSpeed: {}\nflapRotate: {}\ntimeplanMode: {}\
-        \ntemperature: {}\nnightMode: {}\ntimerStatus: {}\nheatingDisabled: {}\ncoolingDisabled: {}\nhotelMode: {}\
-        \nuptime: {} seconds\nsoftwareVersion: {}\ndateTime: {}\nUID: {}\ndeviceType: {}\nip: {}\nsubnet: {}\
-        \ngateway: {}\ndhcp: {}\nserial: {}\nname: {}\nSSIDs: {}\nMqttClient: {}\nMqttList: {}\nunkown: {}\
-        \nbacklog: {}".format(
-            self.setPoint, self.workingMode, self.powerState, self.fanSpeed, self.flapRotate, self.timeplanMode,
-            self.temperature, self.nightMode, self.timerStatus, self.heatingDisabled, self.coolingDisabled,
-            self.hotelMode, self.uptime, self.softwareVersion, self.dateTime.isoformat(), self.UID, self.deviceType,
-            self.ip, self.subnet, self.gateway, self.dhcp, self.serial, self.name, self.wifi, self.mqttClient,
-            self.mqttList, self.unknown, self.changeBacklog)
-        return ret
+        return (
+            f"SC23DCI\n"
+            f"set_point:{self.set_point}\n"
+            f"working_mode: {self.working_mode}\n"
+            f"power_state: {self.power_state}\n"
+            f"fan_speed: {self.fan_speed}\n"
+            f"flap_rotate: {self.flap_rotate}\n"
+            f"timeplan_mode: {self.timeplan_mode}\n"
+            f"temperature: {self.temperature}\n"
+            f"night_mode: {self.night_mode}\n"
+            f"timer_status: {self.timer_status}\n"
+            f"heating_disabled: {self.heating_disabled}\n"
+            f"cooling_disabled: {self.cooling_disabled}\n"
+            f"hotel_mode: {self.hotel_mode}\n"
+            f"uptime: {self.uptime} seconds\n"
+            f"software_version: {self.software_version}\n"
+            f"dateTime: {self.date_time}\n"
+            f"uid: {self.uid}\n"
+            f"device_type: {self.device_type}\n"
+            f"ip: {self.ip}\n"
+            f"subnet: {self.subnet}\n"
+            f"gateway: {self.gateway}\n"
+            f"dhcp: {self.dhcp}\n"
+            f"serial: {self.serial}\n"
+            f"name: {self.name}\n"
+            f"SSIDs: {self.wifi}\n"
+            f"MqttClient: {self.mqtt_client}\n"
+            f"MqttList: {self.mqtt_list}\n"
+            f"unkown: {self.unknown}\n"
+            f"backlog: {self.change_backlog}"
+        )
 
     # http section
-    def httpGet(self, endpoint):
+    def http_get(self, endpoint):
+        """
+        Getter for SC23DCI API endpoints
+        :param endpoint: the endpoint of the API. eg.: status | network/scan
+        :return: the response body as json or none
+        """
         retries = 0
-        while retries <= self.httpTimeoutRetryCount:
+        while retries <= self.http_timeout_retry_count:
             try:
-                res = req.get(self.reqBaseurl + endpoint, timeout=self.httpTimeout)
+                res = req.get(self.req_base_url + endpoint, timeout=self.http_timeout)
                 if res.status_code != 200:
-                    logger.error('GET {} {}'.format(endpoint, res.status_code))
-                    # This means something went wrong.
-                    raise ApiError('GET {} {}'.format(endpoint, res.status_code))
-                # logger.debug("status: {}, response: {}", res.status_code, res.json())
+                    logger.error(f"GET {endpoint} {res.status_code}")
+                    # something went wrong.
+                    raise ApiError(f"GET {endpoint} {res.status_code}")
                 return res.json()
             except:
-                logger.debug("Timeout on {}{}".format(self.reqBaseurl, endpoint))
+                logger.debug(f"Timeout on {self.req_base_url}{endpoint}")
+                time.sleep(1)
                 retries += 1
-        logger.debug("Missed all timeout retries {}{}".format(self.reqBaseurl, endpoint))
+        logger.debug(f"Missed all timeout retries {self.req_base_url}{endpoint}")
+        return None
 
-    def httpPost(self, endpoint, data=None):
+    def http_post(self, endpoint, data=None):
+        """
+        Setter for SC23DCI API endpoints
+        :param endpoint: the endpoint of the API. eg.: power/on
+        :param data: the request body
+        :return: the response body as json or none
+        """
         retries = 0
-        while retries <= self.httpTimeoutRetryCount:
+        while retries <= self.http_timeout_retry_count:
             try:
                 if data is not None:
-                    res = req.post(self.reqBaseurl + endpoint, data=data, timeout=self.httpTimeout)
+                    res = req.post(
+                        self.req_base_url + endpoint,
+                        data=data,
+                        timeout=self.http_timeout
+                    )
                 else:
-                    res = req.post(self.reqBaseurl + endpoint, timeout=self.httpTimeout)
+                    res = req.post(
+                        self.req_base_url + endpoint,
+                        timeout=self.http_timeout
+                    )
                 if res.status_code != 200:
-                    logger.error('POST {} {}'.format(endpoint, res.status_code))
+                    logger.error(f"POST {endpoint} {res.status_code}")
                     # This means something went wrong.
-                    raise ApiError('POST {} {}'.format(endpoint, res.status_code))
+                    raise ApiError(f"POST {endpoint} {res.status_code}")
                 # logger.debug("status: {}, response: {}", res.status_code, res.json())
                 return res.json()
             except:
-                logger.debug("Timeout on POST {}{}, data: {}".format(self.reqBaseurl, endpoint, data))
+                logger.debug(
+                    f"Timeout on POST {self.req_base_url}{endpoint}, data: {data}"
+                )
                 retries += 1
-        logger.debug("Missed all timeout retries {}{}, data: {}".format(self.reqBaseurl, endpoint, data))
+        logger.debug(f"Missed all timeout retries {self.req_base_url}{endpoint}, data: {data}")
+        return None
 
     def refresh(self):
+        """
+        Polls new data from the device and updates this instance
+        """
         self.unknown = []
-        ret = self.httpGet('status')
+        ret = self.http_get('status')
         if ret is not None:
             data = ret['RESULT']
-            self.softwareVersion = ret['sw']['V']
-            self.UID = ret['UID']
-            self.deviceType = ret['deviceType']
-            self.dateTime = datetime(
+            self.software_version = ret['sw']['V']
+            self.uid = ret['UID']
+            self.device_type = ret['deviceType']
+            self.date_time = datetime(
                 day=ret['time']['d'],
                 month=ret['time']['m'],
                 year=ret['time']['y'],
@@ -142,40 +200,71 @@ class SC23DCI:
             self.dhcp = ret['net']['dhcp']
             self.serial = ret['setup']['serial']
             self.name = ret['setup']['name']
-            self.setPoint = data['sp']  # set temperature
-            self.workingMode = data['wm']  # mode: heating(0), cooling(1), dehumidification(3), fan_only(4), auto(5)
-            self.powerState = data['ps']  # off: 0, on: 1
-            self.fanSpeed = data['fs']  # Auto: 0, speeds: 1-3
-            self.flapRotate = data['fr']  # rotate: 0, fixed: 7
-            self.timeplanMode = data['cm']  # off: 0, on: 1
-            self.unknown.append({"a": data['a']})  # a?
-            self.temperature = data['t']  # room temperature °C (integer)
-            self.unknown.append({"cp": data['cp']})  # cp?
-            self.nightMode = data['nm']  # off: 0, on: 1
-            self.unknown.append({"ns": data['ns']})  # ns?
-            self.unknown.append({"cloudStatus": data['cloudStatus']})  # cloudstatus?
-            self.unknown.append({"connectionStatus": data['connectionStatus']})  # connectionstatus?
-            self.unknown.append({"cloudConfig": data['cloudConfig']})  # cloudConfig?
+            # temperature set point in °C
+            self.set_point = data['sp']
+            # working mode: heating(0), cooling(1), dehumidification(3), fan_only(4), auto(5)
+            self.working_mode = data['wm']
+            # power state: off: 0, on: 1
+            self.power_state = data['ps']
+            # fan speed: auto: 0, speeds: 1-3
+            self.fan_speed = data['fs']
+            # flap rotate: rotate: 0, fixed: 7
+            self.flap_rotate = data['fr']
+            # timeplan mode: off: 0, on: 1
+            self.timeplan_mode = data['cm']
+            # a? maybe related to timeplan_mode?
+            self.unknown.append({"a": data['a']})
+            # room temperature °C (integer)
+            self.temperature = data['t']
+            # cp? maybe state of the external relais input on the power terminals
+            self.unknown.append({"cp": data['cp']})
+            # night mode: off: 0, on: 1
+            self.night_mode = data['nm']
+            # ns?
+            self.unknown.append({"ns": data['ns']})
+            # cloudstatus?
+            self.unknown.append({"cloudStatus": data['cloudStatus']})
+            # connectionstatus?
+            self.unknown.append({"connectionStatus": data['connectionStatus']})
+            # cloudConfig?
+            self.unknown.append({"cloudConfig": data['cloudConfig']})
+            # the last configured working mode?
             self.unknown.append({"cfg_lastWorkingMode": data['cfg_lastWorkingMode']})
-            self.timerStatus = data['timerStatus']  # Timer active: 1, Timer inactive: 0
-            self.heatingDisabled = data['heatingDisabled']  # 0/1
-            self.coolingDisabled = data['coolingDisabled']  # 0/1
-            self.hotelMode = data['hotelMode']  # off: 0, on: 1
-            self.unknown.append({"kl": data['kl']})  # kl?
-            self.unknown.append({"heatingResistance": data['heatingResistance']})  # heating with heating resistance  off: 0, on: 1
-            self.unknown.append({"inputFlags": data['inputFlags']})  # inputFlags?
-            self.unknown.append({"ncc": data['ncc']})  # ncc?
-            self.unknown.append({"pwd": data['pwd']})  # pwd?
-            self.unknown.append({"heap": data['heap']})  # heap (free or used? kbytes or bytes?)
-            self.unknown.append({"ccv": data['ccv']})  # ccv?
-            self.unknown.append({"cci": data['cci']})  # cci?
-            self.unknown.append({"daynumber": data['daynumber']})  # daynumber (weekday? Sa: 0, Su: ?, Mo: ?, Tu: ?, We: ?, Th: ?, Fr: ?)
-            self.uptime = data['uptime']  # uptime of wifi? seconds? intervals: 5
-            self.unknown.append({"uscm": data['uscm']})  # uscm?
-            self.unknown.append({"lastRefresh": data['lastRefresh']})  # lastRefresh (data x ms old?)
+            # Timer active: 1, Timer inactive: 0
+            self.timer_status = data['timerStatus']
+            # heating: disabled = 1, enabled = 0
+            self.heating_disabled = data['heatingDisabled']
+            # cooling: disabled = 1, enabled = 0
+            self.cooling_disabled = data['coolingDisabled']
+            # hotel mode: off: 0, on: 1
+            self.hotel_mode = data['hotelMode']
+            # kl?
+            self.unknown.append({"kl": data['kl']})
+            # heating with heating resistance  off: 0, on: 1
+            self.unknown.append({"heatingResistance": data['heatingResistance']})
+            # inputFlags?
+            self.unknown.append({"inputFlags": data['inputFlags']})
+            # ncc?
+            self.unknown.append({"ncc": data['ncc']})
+            # pwd? maybe secure the api with pwd? how would auth work?
+            self.unknown.append({"pwd": data['pwd']})
+            # heap (free or used? kbytes or bytes?)
+            self.unknown.append({"heap": data['heap']})
+            # ccv?
+            self.unknown.append({"ccv": data['ccv']})
+            # cci?
+            self.unknown.append({"cci": data['cci']})
+            # daynumber (weekday? Sa: ?, Su: ?, Mo: ?, Tu: ?, We: ?, Th: ?, Fr: ?)
+            self.unknown.append({"daynumber": data['daynumber']})
+            # uptime of ??? maybe the Wi-Fi connection? seconds? updates in intervals of 5 seconds
+            self.uptime = data['uptime']
+            # uscm?
+            self.unknown.append({"uscm": data['uscm']})
+            # lastRefresh (data x ms old?)
+            self.unknown.append({"lastRefresh": data['lastRefresh']})
 
-            backlogs = self.changeBacklog
-            self.changeBacklog = []
+            backlogs = self.change_backlog
+            self.change_backlog = []
             for backlog in backlogs:
                 if data[backlog['key']] != backlog['value']:
                     if backlog['arg'] is None:
@@ -183,119 +272,191 @@ class SC23DCI:
                     else:
                         backlog['func'](backlog['arg'])
 
-            if self.mqttClient != 0 and len(self.mqttList) > 0:
-                self.mqttPublish()
+            if self.mqtt_client != 0 and len(self.mqtt_list) > 0:
+                self.mqtt_publish()
         # logger.debug(self)
 
-    def addBacklog(self, func, arg, key, value):
-        backlogs = self.changeBacklog
+    def add_backlog(self, func, arg, key, value):
+        """
+        Adds a write request to the backlog.
+        Will be removed when read value equals the written value.
+        Backlog items that were not removed will be called again
+        with the next refreshes until they are removed.
+        :param func: The target function. eg.: self.set_working_mode
+        :param arg: The argument for the function func
+        :param key: The unique key to identify the item in the backlog
+        :param value: The value to be written to the device
+        """
+        backlogs = self.change_backlog
         for backlog in backlogs:
             if backlog['func'] == func:
-                self.changeBacklog.remove(backlog)
-        self.changeBacklog.append({'func': func, 'arg': arg, 'key': key, 'value': value})
+                self.change_backlog.remove(backlog)
+        self.change_backlog.append({'func': func, 'arg': arg, 'key': key, 'value': value})
 
-    def clearSSIDs(self):
+    def clear_ssids(self):
+        """
+        clears the ssid list
+        """
         self.wifi = []
 
-    def getSSIDs(self):
-        ret = self.httpGet('network/scan')
+    def get_ssids(self):
+        """
+        API Getter for the Wi-Fi SSIDs
+        :return: The List of SSIDs or None
+        """
+        ret = self.http_get('network/scan')
         data = ret['RESULT']
         if ret is None:
-            return
+            return None
         for wifi in data:
             if wifi not in self.wifi:
                 self.wifi.append(Wifi(wifi))
         return self.wifi
 
-    def scanSSIDs(self):
-        self.clearSSIDs()
+    def scan_ssids(self):
+        """
+        Scans Wi-Fi SSIDs using the API
+        :return:
+        """
+        self.clear_ssids()
         for i in range(5):
-            self.getSSIDs()
+            self.get_ssids()
             sleep(1)
         return self.wifi
 
-    def switchOn(self):
-        self.addBacklog(self.switchOn, None, 'ps', 1)
-        ret = self.httpPost('power/on')
+    def switch_on(self):
+        """
+        Sends Power on request to the API
+        """
+        self.add_backlog(self.switch_on, None, 'ps', 1)
+        ret = self.http_post('power/on')
 
-    def switchOff(self):
-        self.addBacklog(self.switchOff, None, 'ps', 0)
-        ret = self.httpPost('power/off')
+    def switch_off(self):
+        """
+        Sends Power off request to the API
+        """
+        self.add_backlog(self.switch_off, None, 'ps', 0)
+        ret = self.http_post('power/off')
 
-    def setTemperature(self, setPoint):
-        setPoint = round(max(min(setPoint, 31), 16))
-        self.addBacklog(self.setTemperature, setPoint, 'sp', setPoint)
-        ret = self.httpPost('set/setpoint', {'p_temp': setPoint})
+    def set_temperature(self, set_point):
+        """
+        Sends temperature set point request to the API
+        :param set_point: The target temperature in °C
+        """
+        set_point = round(max(min(set_point, 31), 16))
+        self.add_backlog(self.set_temperature, set_point, 'sp', set_point)
+        ret = self.http_post('set/setpoint', {'p_temp': set_point})
 
-    def setFanSpeed(self, speed):
+    def set_fan_speed(self, speed):
+        """
+        Sends fan speed request to the API
+        :param speed: The fanspeed auto:0, speed: 1-3
+        """
         speed = max(min(speed, 3), 0)
-        self.addBacklog(self.setFanSpeed, speed, 'fs', speed)
-        ret = self.httpPost('set/fan', {'value': speed})
+        self.add_backlog(self.set_fan_speed, speed, 'fs', speed)
+        ret = self.http_post('set/fan', {'value': speed})
 
-    def setFlapRotation(self, rotate):
+    def set_flap_rotation(self, rotate):
+        """
+        Sends flap rotation request to the API
+        :param rotate: Rotate: 0, fixed: 7
+        """
         mode = 0 if rotate else 7
-        self.addBacklog(self.setFlapRotation, rotate, 'fr', mode)
-        ret = self.httpPost('set/feature/rotation', {'value': mode})
+        self.add_backlog(self.set_flap_rotation, rotate, 'fr', mode)
+        ret = self.http_post('set/feature/rotation', {'value': mode})
 
-    def setNightMode(self, night):
+    def set_night_mode(self, night):
+        """
+        Sends night mode request to the API
+        :param night: Nightmode true: on, false: off
+        """
         mode = 1 if night else 0
-        self.addBacklog(self.setNightMode, night, 'nm', mode)
-        ret = self.httpPost('set/feature/night', {'value': mode})
+        self.add_backlog(self.set_night_mode, night, 'nm', mode)
+        ret = self.http_post('set/feature/night', {'value': mode})
 
-    def setTimeplanMode(self, mode):
+    def set_timeplan_mode(self, mode):
+        """
+        Sends timeplan mode request to the API
+        :param mode: Timeplan mode true: on, false: off
+        """
         endpoint = 'on' if mode else 'off'
-        self.addBacklog(self.setTimeplanMode, mode, 'cm', (1 if mode else 0))
-        ret = self.httpPost('set/calendar/' + endpoint)
+        self.add_backlog(self.set_timeplan_mode, mode, 'cm', (1 if mode else 0))
+        ret = self.http_post('set/calendar/' + endpoint)
 
-    def setWorkingMode(self, mode):
+    def set_working_mode(self, mode):
+        """
+        Sends working mode request to the API
+        :param mode: the target working mode.
+        heating:0, cooling:1, dehumidification:3, fan_only:4, auto:5"
+        """
         if mode < 0 or mode == 2 or mode > 5:
-            logger.warning("{} not allowed. heating:0, cooling:1, dehumidification:3, fan_only:4, auto:5", mode)
+            logger.warning(
+                f"{mode} not allowed. heating:0, cooling:1, dehumidification:3, fan_only:4, auto:5"
+            )
             return
         endpoint = ['heating', 'cooling', '', 'dehumidification', 'fanonly', 'auto']
-        self.addBacklog(self.setWorkingMode, mode, 'wm', mode)
-        ret = self.httpPost('set/mode/' + endpoint[mode])
+        self.add_backlog(self.set_working_mode, mode, 'wm', mode)
+        ret = self.http_post('set/mode/' + endpoint[mode])
 
-    def setModeAuto(self):
-        self.setWorkingMode(5)
+    def set_mode_auto(self):
+        """
+        Sends working mode auto request to the API
+        """
+        self.set_working_mode(5)
 
-    def setModeFanOnly(self):
-        self.setWorkingMode(4)
+    def set_mode_fan_only(self):
+        """
+        Sends working mode fan only request to the API
+        """
+        self.set_working_mode(4)
 
-    def setModeDehumidification(self):
-        self.setWorkingMode(3)
+    def set_mode_dehumidification(self):
+        """
+        Sends working mode dehumidify request to the API
+        """
+        self.set_working_mode(3)
 
-    def setModeCooling(self):
-        self.setWorkingMode(1)
+    def set_mode_cooling(self):
+        """
+        Sends working mode cooling request to the API
+        """
+        self.set_working_mode(1)
 
-    def setModeHeating(self):
-        self.setWorkingMode(0)
+    def set_mode_heating(self):
+        """
+        Sends working mode heating request to the API
+        """
+        self.set_working_mode(0)
 
     # mqtt section
-    def mqttPublish(self):
-        for pub in self.mqttList:
-            if pub['id'] == 'temperature':
-                self.mqttClient.publish(pub['topic'], payload=self.temperature)
-            if pub['id'] == 'powerstate':
-                self.mqttClient.publish(pub['topic'], payload=self.powerState)
-            if pub['id'] == 'all':
-                allPayload = {
-                    "setPoint": self.setPoint,
-                    "workingMode": self.workingMode,
-                    "powerState": self.powerState,
-                    "fanSpeed": self.fanSpeed,
-                    "flapRotate": self.flapRotate,
-                    "timeplanMode": self.timeplanMode,
+    def mqtt_publish(self):
+        """
+        Publisher for MQTT
+        """
+        for pub in self.mqtt_list:
+            if pub['_id'] == 'temperature':
+                self.mqtt_client.publish(pub['topic'], payload=self.temperature)
+            if pub['_id'] == 'powerstate':
+                self.mqtt_client.publish(pub['topic'], payload=self.power_state)
+            if pub['_id'] == 'all':
+                all_payload = {
+                    "set_point": self.set_point,
+                    "working_mode": self.working_mode,
+                    "power_state": self.power_state,
+                    "fan_speed": self.fan_speed,
+                    "flap_rotate": self.flap_rotate,
+                    "timeplan_mode": self.timeplan_mode,
                     "temperature": self.temperature,
-                    "nightMode": self.nightMode,
-                    "timerStatus": self.timerStatus,
-                    "heatingDisabled": self.heatingDisabled,
-                    "coolingDisabled": self.coolingDisabled,
-                    "hotelMode": self.hotelMode,
+                    "night_mode": self.night_mode,
+                    "timer_status": self.timer_status,
+                    "heating_disabled": self.heating_disabled,
+                    "cooling_disabled": self.cooling_disabled,
+                    "hotel_mode": self.hotel_mode,
                     "uptime": self.uptime,
-                    "softwareVersion": self.softwareVersion,
-                    "time": self.dateTime.isoformat(),
-                    "UID": self.UID,
-                    "deviceType": self.deviceType,
+                    "software_version": self.software_version,
+                    "time": self.date_time.isoformat(),
+                    "uid": self.uid,
+                    "device_type": self.device_type,
                     "ip": self.ip,
                     "subnet": self.subnet,
                     "gateway": self.gateway,
@@ -303,74 +464,144 @@ class SC23DCI:
                     "serial": self.serial,
                     "name": self.name,
                     "wifi": self.wifi,
-                    "mqttSubList": self.mqttList
+                    "mqttSubList": self.mqtt_list
                 }
-                self.mqttClient.publish(pub['topic'], payload=json.dumps(allPayload))
+                self.mqtt_client.publish(pub['topic'], payload=json.dumps(all_payload))
 
-    def mqttOnConnect(self, client, userdata, flags, rc):
-        logger.info("MQTT connected with result code {}".format(rc))
+    def mqtt_on_connect(self, client, userdata, flags, rc):
+        """
+        MQTT on connect callback
+        :param client:
+        :param userdata:
+        :param flags:
+        :param rc:
+        :return:
+        """
+        logger.info(f"MQTT connected with result code {rc}")
 
-    def mqttOnDisconnect(self, client, userdata, flags, rc):
-        logger.info("MQTT disconnected with result code {}".format(rc))
+    def mqtt_on_disconnect(self, client, userdata, flags, rc):
+        """
+        MQTT on disconnect callback
+        :param client:
+        :param userdata:
+        :param flags:
+        :param rc:
+        :return:
+        """
+        logger.info(f"MQTT disconnected with result code {rc}")
 
-    def setMqttClient(self, broker):
-        self.mqttClient = mqtt.Client()
-        # self.mqttClient.enable_logger(logger=logger)
-        self.mqttClient.on_connect = self.mqttOnConnect
-        self.mqttClient.on_disconnect = self.mqttOnDisconnect
-        try:
-            self.mqttClient.connect(broker)
-            self.mqttClient.loop_start()
-        except:
-            logger.error("MQTT connection failed")
+    def set_mqtt_client(self, broker):
+        """
+        Sets up the MQTT client
+        :param broker: the ip or hostname
+        """
+        self.mqtt_client = mqtt.Client()
+        # self.mqtt_client.enable_logger(logger=logger)
+        self.mqtt_client.on_connect = self.mqtt_on_connect
+        self.mqtt_client.on_disconnect = self.mqtt_on_disconnect
+        self.mqtt_client.connect(broker)
+        self.mqtt_client.loop_start()
 
-    def mqttEnablePublish(self, topic, id):
+
+    def mqtt_enable_publish(self, topic, _id):
+        """
+        Enables publishing for topic
+        :param topic: The topic to enable publish on
+        :param _id: The unique id of the topic
+        """
         new_pub = {
-            'id': id,
+            '_id': _id,
             'topic': topic
         }
-        for pub in self.mqttList:
-            if 'id' in pub:
-                if pub['id'] == id:
-                    self.mqttList.remove(pub)
-        self.mqttList.append(new_pub)
+        for pub in self.mqtt_list:
+            if '_id' in pub:
+                if pub['_id'] == _id:
+                    self.mqtt_list.remove(pub)
+        self.mqtt_list.append(new_pub)
 
-    def mqttDisablePublish(self, topic, id):
+    def mqtt_disable_publish(self, topic, _id):
+        """
+        Disables publishing for topic
+        :param topic: The topic to disable publish on
+        :param _id: The unique id of the topic
+        """
         pub = {
-            'id': id,
+            '_id': _id,
             'topic': topic
         }
-        self.mqttList.remove(pub)
+        self.mqtt_list.remove(pub)
 
-    def mqttEnablePublishTemperature(self, topic):
-        self.mqttEnablePublish(topic, 'temperature')
+    def mqtt_enable_publish_temperature(self, topic):
+        """
+        Enables publishing of the temperature sensor
+        :param topic: The topic to enable publish on
+        """
+        self.mqtt_enable_publish(topic, 'temperature')
 
-    def mqttEnablePublishPowerState(self, topic):
-        self.mqttEnablePublish(topic, 'powerstate')
+    def mqtt_enable_publish_power_state(self, topic):
+        """
+        Enables publishing of the power state
+        :param topic: The topic to enable publish on
+        """
+        self.mqtt_enable_publish(topic, 'powerstate')
 
-    def mqttEnablePublishAll(self, topic):
-        self.mqttEnablePublish(topic, 'all')
+    def mqtt_enable_publish_all(self, topic):
+        """
+        Enables publishing of the summary
+        :param topic: The topic to enable publish on
+        """
+        self.mqtt_enable_publish(topic, 'all')
 
-    def mqttSubscribeSetPowerstate(self, topic):
-        self.mqttClient.subscribe(topic)
-        self.mqttClient.message_callback_add(topic, self.onMqttPowerState)
+    def mqtt_subscribe_set_powerstate(self, topic):
+        """
+        Enables subscribing to the powerstate setter topic
+        :param topic: The topic to subscribe to
+        """
+        self.mqtt_client.subscribe(topic)
+        self.mqtt_client.message_callback_add(topic, self.on_mqtt_power_state)
 
-    def mqttSubscribeSetMode(self, topic):
-        self.mqttClient.subscribe(topic)
-        self.mqttClient.message_callback_add(topic, self.onMqttMode)
+    def mqtt_subscribe_set_mode(self, topic):
+        """
+        Enables subscribing to the working mode setter topic
+        :param topic: The topic to subscribe to
+        """
+        self.mqtt_client.subscribe(topic)
+        self.mqtt_client.message_callback_add(topic, self.on_mqtt_mode)
 
-    def mqttSubscribeSetSetpoint(self, topic):
-        self.mqttClient.subscribe(topic)
-        self.mqttClient.message_callback_add(topic, self.onMqttSetpoint)
+    def mqtt_subscribe_set_setpoint(self, topic):
+        """
+        Enables subscribing to the temperature set point setter topic
+        :param topic: The topic to subscribe to
+        """
+        self.mqtt_client.subscribe(topic)
+        self.mqtt_client.message_callback_add(topic, self.on_mqtt_setpoint)
 
-    def onMqttPowerState(self, client, userdata, msg):
+    def on_mqtt_power_state(self, client, userdata, msg):
+        """
+        The callback of the power state setter subscribe
+        :param client: The MQTT client
+        :param userdata:
+        :param msg: The message with payload
+        """
         if int(float(msg.payload)) == 0:
-            self.switchOff()
+            self.switch_off()
         else:
-            self.switchOn()
+            self.switch_on()
 
-    def onMqttMode(self, client, userdata, msg):
-        self.setWorkingMode(int(float(msg.payload)))
+    def on_mqtt_mode(self, client, userdata, msg):
+        """
+        The callback of the working mode setter subscribe
+        :param client: The MQTT client
+        :param userdata:
+        :param msg: The message with payload
+        """
+        self.set_working_mode(int(float(msg.payload)))
 
-    def onMqttSetpoint(self, client, userdata, msg):
-        self.setTemperature(int(float(msg.payload)))
+    def on_mqtt_setpoint(self, client, userdata, msg):
+        """
+        The callback of the temperature set point setter subscribe
+        :param client: The MQTT client
+        :param userdata:
+        :param msg: The message with payload
+        """
+        self.set_temperature(int(float(msg.payload)))
