@@ -238,7 +238,7 @@ class SC23DCI:
             self.cooling_disabled = data['coolingDisabled']
             # hotel mode: off: 0, on: 1
             self.hotel_mode = data['hotelMode']
-            # kl?
+            # kl? Key Lock?
             self.unknown.append({"kl": data['kl']})
             # heating with heating resistance  off: 0, on: 1
             self.unknown.append({"heatingResistance": data['heatingResistance']})
