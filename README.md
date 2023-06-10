@@ -4,11 +4,30 @@ Works with Devices like this one: https://www.frico.net/fileadmin/user_upload/fr
 
 ## Setup
 
-1. Setup your Wi-Fi in your A/C unit using https://play.google.com/store/apps/details?id=it.kumbe.innovapp20
-2. Configure ```.env.file```
-3. ```docker-compose up```
+### Activate Wi-Fi
 
-## Control the device over MQTT
+While the A/C is running, long press the power icon on the display. After a few seconds you can cycle 
+through ```[on, rst, off]``` by tapping the power icon. This sets Wi-Fi on/off or resets the WiFi-Config.
+When the display shows the desired value, wait a few seconds and the setting is saved.
+
+Entering this menu can be a tedious because the A/C tends to just turn off when the power icon is pressed.
+You can try this:
+Turn the A/C off, then double tap the power icon and do not lift your finger on the second tap.
+I think it takes ~5 seconds until the menu appears. 
+
+If you were successful, the A/C will create a WLAN, through which it can be configured using the [app](https://play.google.com/store/apps/details?id=it.kumbe.innovapp20) 
+and can be integrated into your WLAN.
+
+### Setup Wi-FI
+
+Setup your Wi-Fi in your A/C unit using https://play.google.com/store/apps/details?id=it.kumbe.innovapp20
+
+### Setup MQTT-Agent
+
+1. Configure ```.env.file```
+2. ```docker-compose up```
+
+## Control the device via MQTT
 
 ### Set temperature
 
