@@ -10,7 +10,7 @@ While the A/C is running, long press the power icon on the display. After a few 
 through ```[on, rst, off]``` by tapping the power icon. This sets Wi-Fi on/off or resets the WiFi-Config.
 When the display shows the desired value, wait a few seconds and the setting is saved.
 
-Entering this menu can be a tedious because the A/C tends to just turn off when the power icon is pressed.
+Entering this menu can be a bit tedious because the A/C tends to just turn off when the power icon is pressed.
 You can try this:
 Turn the A/C off, then double tap the power icon and do not lift your finger on the second tap.
 I think it takes ~5 seconds until the menu appears. 
@@ -33,9 +33,9 @@ Setup your Wi-Fi in your A/C unit using https://play.google.com/store/apps/detai
 
 eg. set temperature to 20°C
 
-If the configured topic is ```topic/ac/powerstate/set```
+If the configured topic is ```topic/ac/setpoint/set```
 
- Publish the payload ```20``` to ```topic/ac/powerstate/set```
+ Publish the payload ```20``` to ```topic/ac/setpoint/set```
  
 ### Set mode
 
