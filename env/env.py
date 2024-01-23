@@ -22,7 +22,9 @@ class Env:
         'MQTT_TOPIC_MODE_SET',
         'MQTT_TOPIC_SETPOINT_SET',
         'SC23DCI_IP',
-        'SC23DCI_POLL_INTERVAL'
+        'SC23DCI_POLL_INTERVAL',
+        'MQTT_HASSIO_AUTODETECT',
+        'MQTT_HASSIO_OBJECT_ID'
     ]
 
     @staticmethod
