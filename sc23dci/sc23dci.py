@@ -6,6 +6,7 @@ import json
 import time
 from datetime import datetime
 from time import sleep
+from env.env import Env
 
 import paho.mqtt.client as mqtt
 import requests as req
@@ -389,12 +390,15 @@ class SC23DCI:
         :param mode: the target working mode.
         heating:0, cooling:1, dehumidification:3, fan_only:4, auto:5"
         """
+
+        endpoint = ['heating', 'cooling', '', 'dehumidification', 'fanonly', 'auto']
         if mode < 0 or mode == 2 or mode > 5:
             logger.warning(
                 f"{mode} not allowed. heating:0, cooling:1, dehumidification:3, fan_only:4, auto:5"
             )
             return
-        endpoint = ['heating', 'cooling', '', 'dehumidification', 'fanonly', 'auto']
+        if self.power_state == 0:
+            self.switch_on()
         self.add_backlog(self.set_working_mode, mode, 'wm', mode)
         ret = self.http_post('set/mode/' + endpoint[mode])
 
@@ -443,6 +447,7 @@ class SC23DCI:
                     "set_point": self.set_point,
                     "working_mode": self.working_mode,
                     "power_state": self.power_state,
+                    "mode": self.working_mode if self.power_state == 1 else 6,
                     "fan_speed": self.fan_speed,
                     "flap_rotate": self.flap_rotate,
                     "timeplan_mode": self.timeplan_mode,
@@ -478,6 +483,7 @@ class SC23DCI:
         :return:
         """
         logger.info(f"MQTT connected with result code {rc}")
+        self.mqtt_home_assistant_autodiscover()
 
     def mqtt_on_disconnect(self, client, userdata, flags, rc):
         """
@@ -583,7 +589,11 @@ class SC23DCI:
         :param userdata:
         :param msg: The message with payload
         """
-        if int(float(msg.payload)) == 0:
+        try:
+            target_state = int(float(msg.payload))
+        except (ValueError, TypeError):
+            target_state = int(float(msg.payload.decode('utf-8')))
+        if int(float(target_state)) == 0:
             self.switch_off()
         else:
             self.switch_on()
@@ -595,7 +605,18 @@ class SC23DCI:
         :param userdata:
         :param msg: The message with payload
         """
-        self.set_working_mode(int(float(msg.payload)))
+        try:
+            mode = int(float(msg.payload))
+        except (ValueError, TypeError):
+            mode = msg.payload.decode('utf-8')
+
+        if mode == 'off' or mode == 6:
+            self.switch_off()
+            return
+        endpoint = ['heating', 'cooling', '', 'dehumidification', 'fanonly', 'auto']
+        if mode in endpoint:
+            self.set_working_mode(endpoint.index(mode))
+
 
     def on_mqtt_setpoint(self, client, userdata, msg):
         """
@@ -604,4 +625,48 @@ class SC23DCI:
         :param userdata:
         :param msg: The message with payload
         """
-        self.set_temperature(int(float(msg.payload)))
+        try:
+            self.set_temperature(int(float(msg.payload)))
+        except (ValueError, TypeError):
+            self.set_temperature(int(float(msg.payload.decode('utf-8'))))
+
+    def mqtt_home_assistant_autodiscover(self):
+        """
+        Home assistant autodiscover publisher
+        """
+        if not Env.get_env('MQTT_HASSIO_AUTODETECT'):
+            return
+        discovery_prefix='homeassistant'
+        component='climate'
+        object_id=Env.get_env('MQTT_HASSIO_OBJECT_ID')
+        config={
+            'name': 'SC23DCI',
+            'unique_id': object_id,
+            'modes': ['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'],
+#            'swing_modes': [],
+#            'fan_modes': [],
+#            'preset_modes': [],
+            'max_temp': '30',
+            'min_temp': '16',
+            'temperature_unit': 'C',
+            'mode_command_topic': Env.get_env('MQTT_TOPIC_MODE_SET'),
+            'mode_command_template': "{{"
+                                     " ['heating', 'cooling', 'dehumidification', 'fanonly', 'auto', 'off']"
+                                     "[['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'].index(value)]"
+                                     " if value in ['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'] else value "
+                                     "}}",
+            'mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
+            'mode_state_template': "{{"
+                                   " ['heat', 'cool', '', 'dry', 'fan_only', 'auto', 'off']"
+                                   "[value_json.mode|int] if value_json.mode|int in [0, 1, 3, 4, 5, 6] else value "
+                                   "}}",
+            'temperature_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
+            'temperature_command_template': "{{ value }}",
+            'temperature_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
+            'temperature_state_template': "{{ value_json.set_point }}",
+            'current_temperature_topic': Env.get_env('MQTT_TOPIC_ALL'),
+            'current_temperature_template': "{{ value_json.temperature }}",
+            'sw_version': '1.0.0'
+        }
+        topic = f'{discovery_prefix}/{component}/{object_id}/config'
+        self.mqtt_client.publish(topic, payload=json.dumps(config))
