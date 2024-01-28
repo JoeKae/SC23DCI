@@ -26,9 +26,6 @@ if __name__ == '__main__':
     ac.mqtt_enable_publish_temperature(Env.get_env('MQTT_TOPIC_TEMPERATURE'))
     ac.mqtt_enable_publish_power_state(Env.get_env('MQTT_TOPIC_POWERSTATE'))
     ac.mqtt_enable_publish_all(Env.get_env('MQTT_TOPIC_ALL'))
-    ac.mqtt_subscribe_set_powerstate(Env.get_env('MQTT_TOPIC_POWERSTATE_SET'))
-    ac.mqtt_subscribe_set_mode(Env.get_env('MQTT_TOPIC_MODE_SET'))
-    ac.mqtt_subscribe_set_setpoint(Env.get_env('MQTT_TOPIC_SETPOINT_SET'))
 
     logger.info('Scheduler initialization started')
     taskScheduler = scheduler = BlockingScheduler(daemon=True)

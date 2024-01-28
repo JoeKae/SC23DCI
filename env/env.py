@@ -21,8 +21,15 @@ class Env:
         'MQTT_TOPIC_POWERSTATE_SET',
         'MQTT_TOPIC_MODE_SET',
         'MQTT_TOPIC_SETPOINT_SET',
+        'MQTT_TOPIC_FLAP_MODE',
+        'MQTT_TOPIC_FLAP_MODE_SET',
+        'MQTT_TOPIC_FAN_SPEED',
+        'MQTT_TOPIC_FAN_SPEED_SET',
+        'MQTT_TOPIC_LWT',
         'SC23DCI_IP',
         'SC23DCI_POLL_INTERVAL',
+        'SC23DCI_MAX_TEMP_C',
+        'SC23DCI_MIN_TEMP_C',
         'MQTT_HASSIO_AUTODETECT',
         'MQTT_HASSIO_OBJECT_ID'
     ]

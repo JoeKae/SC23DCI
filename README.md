@@ -29,6 +29,17 @@ Setup your Wi-Fi in your A/C unit using https://play.google.com/store/apps/detai
 
 ## Control the device via MQTT
 
+### Home Assistant
+To use the autodiscovery (zero config) of Home Assistant
+you need to set the environment Variable in .env.file:
+```
+MQTT_HASSIO_AUTODETECT=True
+```
+Also make sure to set a unique ID if you want to set up more than one instance:
+```
+MQTT_HASSIO_OBJECT_ID=SC23DCI-unique-id
+```
+
 ### Set temperature
 
 eg. set temperature to 20°C
@@ -50,6 +61,7 @@ Publish the payload ```1``` to ```topic/ac/mode/set```
 3. dehumidification
 4. fan_only
 5. auto
+6. off
  
 ### Power device on/off
 
@@ -61,3 +73,9 @@ Publish the payload ```0``` to ```topic/ac/powerstate/set```
 
 0. Off
 1. On
+
+# TODO:
+
+- add topic flap rotate
+- add topic fan speed
+- 
