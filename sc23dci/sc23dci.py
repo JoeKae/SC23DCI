@@ -344,7 +344,15 @@ class SC23DCI:
         Sends temperature set point request to the API
         :param set_point: The target temperature in °C
         """
-        set_point = round(max(min(set_point, 31), 16))
+        set_point = round(
+            max(
+                min(
+                    set_point,
+                    Env.get_env('SC23DCI_MAX_TEMP_C')
+                ),
+                Env.get_env('SC23DCI_MIN_TEMP_C')
+            )
+        )
         self.add_backlog(self.set_temperature, set_point, 'sp', set_point)
         ret = self.http_post('set/setpoint', {'p_temp': set_point})
 
@@ -483,6 +491,8 @@ class SC23DCI:
         :return:
         """
         logger.info(f"MQTT connected with result code {rc}")
+        self.mqtt_subscribe_to_all_topics()
+        self.mqtt_client.publish(Env.get_env('MQTT_TOPIC_LWT'), payload='online', retain=True)
         self.mqtt_home_assistant_autodiscover()
 
     def mqtt_on_disconnect(self, client, userdata, flags, rc):
@@ -505,6 +515,7 @@ class SC23DCI:
         # self.mqtt_client.enable_logger(logger=logger)
         self.mqtt_client.on_connect = self.mqtt_on_connect
         self.mqtt_client.on_disconnect = self.mqtt_on_disconnect
+        self.mqtt_client.will_set(Env.get_env('MQTT_TOPIC_LWT'), payload='offline', retain=True)
         self.mqtt_client.connect(broker)
         self.mqtt_client.loop_start()
 
@@ -558,30 +569,88 @@ class SC23DCI:
         """
         self.mqtt_enable_publish(topic, 'all')
 
-    def mqtt_subscribe_set_powerstate(self, topic):
+    def mqtt_subscribe_to_all_topics(self):
+        if Env.get_env('MQTT_HASSIO_AUTODETECT'):
+            def home_assistant_autodiscover_wrapper(client, userdata, msg):
+                status = 'offline'
+                try:
+                    status = msg.payload.decode('utf-8')
+                    if status == 'online':
+                        self.mqtt_home_assistant_autodiscover()
+                except (ValueError, TypeError) as e:
+                    logger.error(e)
+            self.mqtt_subscribe(
+                'homeassistant/status',
+                home_assistant_autodiscover_wrapper
+            )
+            self.mqtt_home_assistant_autodiscover()
+        self.mqtt_subscribe(
+            Env.get_env('MQTT_TOPIC_POWERSTATE_SET'),
+            self.on_mqtt_power_state
+        )
+        self.mqtt_subscribe(
+            Env.get_env('MQTT_TOPIC_MODE_SET'),
+            self.on_mqtt_mode
+        )
+        self.mqtt_subscribe(
+            Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
+            self.on_mqtt_setpoint
+        )
+        self.mqtt_subscribe(
+            Env.get_env('MQTT_TOPIC_FLAP_MODE_SET'),
+            self.on_mqtt_flap_mode
+        )
+        self.mqtt_subscribe(
+            Env.get_env('MQTT_TOPIC_FAN_SPEED_SET'),
+            self.on_mqtt_fan_speed
+        )
+
+    def mqtt_subscribe(self, topic, cb):
         """
-        Enables subscribing to the powerstate setter topic
+        Enables subscribing to the topic and sets the callback
         :param topic: The topic to subscribe to
+        :param cb: The callback function -> (client, userdata, msg)
         """
         self.mqtt_client.subscribe(topic)
-        self.mqtt_client.message_callback_add(topic, self.on_mqtt_power_state)
+        self.mqtt_client.message_callback_add(topic, cb)
 
-    def mqtt_subscribe_set_mode(self, topic):
+    def on_mqtt_flap_mode(self, client, userdata, msg):
         """
-        Enables subscribing to the working mode setter topic
-        :param topic: The topic to subscribe to
+        The callback of the flap mode setter subscribe
+        :param client: The MQTT client
+        :param userdata:
+        :param msg: The message with payload
         """
-        self.mqtt_client.subscribe(topic)
-        self.mqtt_client.message_callback_add(topic, self.on_mqtt_mode)
-
-    def mqtt_subscribe_set_setpoint(self, topic):
+        try:
+            target_mode = int(float(msg.payload))
+        except (ValueError, TypeError):
+            target_mode = msg.payload.decode('utf-8')
+        if target_mode == 'off':
+            target_mode = 7
+        elif target_mode == 'on':
+            target_mode = 0
+        self.set_flap_rotation(target_mode)
+    def on_mqtt_fan_speed(self, client, userdata, msg):
         """
-        Enables subscribing to the temperature set point setter topic
-        :param topic: The topic to subscribe to
+        The callback of the fan speed setter subscribe
+        :param client: The MQTT client
+        :param userdata:
+        :param msg: The message with payload
         """
-        self.mqtt_client.subscribe(topic)
-        self.mqtt_client.message_callback_add(topic, self.on_mqtt_setpoint)
-
+        try:
+            target_speed = int(float(msg.payload))
+        except (ValueError, TypeError):
+            target_speed = msg.payload.decode('utf-8')
+        match target_speed:
+            case 'auto':
+                target_speed = 0
+            case 'low':
+                target_speed = 1
+            case 'medium':
+                target_speed = 2
+            case 'high':
+                target_speed = 3
+        self.set_fan_speed(target_speed)
     def on_mqtt_power_state(self, client, userdata, msg):
         """
         The callback of the power state setter subscribe
@@ -617,7 +686,6 @@ class SC23DCI:
         if mode in endpoint:
             self.set_working_mode(endpoint.index(mode))
 
-
     def on_mqtt_setpoint(self, client, userdata, msg):
         """
         The callback of the temperature set point setter subscribe
@@ -643,12 +711,10 @@ class SC23DCI:
             'name': 'SC23DCI',
             'unique_id': object_id,
             'modes': ['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'],
-#            'swing_modes': [],
-#            'fan_modes': [],
-#            'preset_modes': [],
-            'max_temp': '30',
-            'min_temp': '16',
+            'max_temp': float(Env.get_env('SC23DCI_MAX_TEMP_C')),
+            'min_temp': float(Env.get_env('SC23DCI_MIN_TEMP_C')),
             'temperature_unit': 'C',
+            'availability_topic': Env.get_env('MQTT_TOPIC_LWT'),
             'mode_command_topic': Env.get_env('MQTT_TOPIC_MODE_SET'),
             'mode_command_template': "{{"
                                      " ['heating', 'cooling', 'dehumidification', 'fanonly', 'auto', 'off']"
@@ -660,13 +726,27 @@ class SC23DCI:
                                    " ['heat', 'cool', '', 'dry', 'fan_only', 'auto', 'off']"
                                    "[value_json.mode|int] if value_json.mode|int in [0, 1, 3, 4, 5, 6] else value "
                                    "}}",
+            'swing_mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
+            'swing_mode_state_template': "{{"
+                                   " ['on', '', '', '', '', '', '', 'off'][value_json.flap_rotate|int]"
+                                       " if value_json.flap_rotate|int in [0, 7] else value "
+                                   "}}",
+            'swing_mode_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
+            'swing_mode_command_template': "{{ value }}",
+            'fan_mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
+            'fan_mode_state_template': "{{"
+                                       " ['auto', 'low', 'medium', 'high'][value_json.fan_speed|int]"
+                                       " if value_json.fan_speed|int in [0, 1, 2, 3] else value "
+                                       "}}",
+            'fan_mode_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
+            'fan_mode_command_template': "{{ value }}",
             'temperature_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
             'temperature_command_template': "{{ value }}",
             'temperature_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
             'temperature_state_template': "{{ value_json.set_point }}",
             'current_temperature_topic': Env.get_env('MQTT_TOPIC_ALL'),
             'current_temperature_template': "{{ value_json.temperature }}",
-            'sw_version': '1.0.0'
+            'sw_version': self.software_version
         }
         topic = f'{discovery_prefix}/{component}/{object_id}/config'
         self.mqtt_client.publish(topic, payload=json.dumps(config))
