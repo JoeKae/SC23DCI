@@ -506,7 +506,7 @@ class SC23DCI:
         """
         logger.info(f"MQTT disconnected with result code {rc}")
 
-    def set_mqtt_client(self, broker):
+    def set_mqtt_client(self, broker, port):
         """
         Sets up the MQTT client
         :param broker: the ip or hostname
@@ -516,7 +516,7 @@ class SC23DCI:
         self.mqtt_client.on_connect = self.mqtt_on_connect
         self.mqtt_client.on_disconnect = self.mqtt_on_disconnect
         self.mqtt_client.will_set(Env.get_env('MQTT_TOPIC_LWT'), payload='offline', retain=True)
-        self.mqtt_client.connect(broker)
+        self.mqtt_client.connect(broker, port)
         self.mqtt_client.loop_start()
 
 
@@ -662,6 +662,11 @@ class SC23DCI:
             target_state = int(float(msg.payload))
         except (ValueError, TypeError):
             target_state = int(float(msg.payload.decode('utf-8')))
+        match target_state:
+            case 'off':
+                target_state = 0
+            case 'on':
+                target_state = 1
         if int(float(target_state)) == 0:
             self.switch_off()
         else:
@@ -704,7 +709,7 @@ class SC23DCI:
         """
         if not Env.get_env('MQTT_HASSIO_AUTODETECT'):
             return
-        discovery_prefix='homeassistant'
+        discovery_prefix = Env.get_env('MQTT_HASSIO_TOPIC')
         component='climate'
         object_id=Env.get_env('MQTT_HASSIO_OBJECT_ID')
         config={

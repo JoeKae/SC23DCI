@@ -22,7 +22,7 @@ if __name__ == '__main__':
     ac = sc23dci.SC23DCI(Env.get_env('SC23DCI_IP'))
 
     logger.info('Creating MqttClient instance')
-    ac.set_mqtt_client(Env.get_env('MQTT_BROKER_IP'))
+    ac.set_mqtt_client(Env.get_env('MQTT_BROKER_IP'), Env.get_env('MQTT_BROKER_PORT'))
     ac.mqtt_enable_publish_temperature(Env.get_env('MQTT_TOPIC_TEMPERATURE'))
     ac.mqtt_enable_publish_power_state(Env.get_env('MQTT_TOPIC_POWERSTATE'))
     ac.mqtt_enable_publish_all(Env.get_env('MQTT_TOPIC_ALL'))
