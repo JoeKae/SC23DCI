@@ -40,7 +40,7 @@ class Env:
     }
 
     @staticmethod
-    def get_env(key: str) -> Optional[str]:
+    def get_env(key: str) -> str:
         """
         Grants read access to valid environment variable
         :param key: The name of the variable to be read
@@ -54,7 +54,7 @@ class Env:
         if env_value is not None:
             return env_value
         elif key in Env.optional_keys:
-            return Env.optional_keys[key]
+            return str(Env.optional_keys[key])
         else:
             raise KeyError('Invalid env key requested')
 
