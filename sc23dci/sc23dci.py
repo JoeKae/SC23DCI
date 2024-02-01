@@ -6,6 +6,10 @@ import json
 import time
 from datetime import datetime
 from time import sleep
+from typing import Optional
+
+import paho.mqtt.client
+
 from env.env import Env
 
 import paho.mqtt.client as mqtt
@@ -17,7 +21,8 @@ class ApiError(Exception):
     """
     Custom Exception for SC23DCI API errors
     """
-    def __init__(self, status):
+
+    def __init__(self, status: str):
         self.status = status
 
     def __str__(self):
@@ -28,11 +33,11 @@ class Wifi:
     """
     Represents Wi-Fi config of the SC23DCI device
     """
-    essid = ""
-    signal = 0
-    password = True
+    essid:str = ""
+    signal: int = 0
+    password: bool = True
 
-    def __init__(self, wifi):
+    def __init__(self, wifi: dict):
         self.essid = wifi['essid']
         self.signal = wifi['signal']
         self.password = wifi['password'] == 'true'
@@ -50,37 +55,37 @@ class SC23DCI:
     """
     Handles all the SC23DCI API polling and MQTT sub/pub
     """
-    mqtt_client = 0
-    mqtt_list = []
-    req_base_url = 0
-    set_point = 0
-    working_mode = 0
-    power_state = 0
-    fan_speed = 0
-    flap_rotate = 0
-    timeplan_mode = 0
-    temperature = 0
-    night_mode = 0
-    timer_status = 0
-    heating_disabled = 0
-    cooling_disabled = 0
-    hotel_mode = 0
-    uptime = 0
-    software_version = 0
-    date_time = datetime.now()
-    uid = 0
-    device_type = 0
-    ip = 0
-    subnet = 0
-    gateway = 0
-    dhcp = 0
-    serial = 0
-    name = 0
-    wifi = []
-    http_timeout = 5
-    http_timeout_retry_count = 0
-    unknown = []
-    change_backlog = []
+    mqtt_client: paho.mqtt.client.Client | None = None
+    mqtt_list: list[dict] = []
+    req_base_url: str | None = None
+    set_point: str | None = None
+    working_mode: str | None = None
+    power_state: str | None = None
+    fan_speed: str | None = None
+    flap_rotate: str | None = None
+    timeplan_mode: str | None = None
+    temperature: str | None = None
+    night_mode: str | None = None
+    timer_status: str | None = None
+    heating_disabled: str | None = None
+    cooling_disabled: str | None = None
+    hotel_mode: str | None = None
+    uptime: str | None = None
+    software_version: str | None = None
+    date_time: str | datetime | None = datetime.now()
+    uid: str | None = None
+    device_type: str | None = None
+    ip: str | None = None
+    subnet: str | None = None
+    gateway: str | None = None
+    dhcp: str | None = None
+    serial: str | None = None
+    name: str | None = None
+    wifi: list[Wifi] = []
+    http_timeout: int = 5
+    http_timeout_retry_count: int = 0
+    unknown: list[dict] = []
+    change_backlog: list[dict] = []
 
     def __init__(self, ip: str):
         self.req_base_url = f"http://{ip}/api/v/1/"
@@ -120,12 +125,14 @@ class SC23DCI:
         )
 
     # http section
-    def http_get(self, endpoint):
+    def http_get(self, endpoint: str):
         """
         Getter for SC23DCI API endpoints
         :param endpoint: the endpoint of the API. eg.: status | network/scan
         :return: the response body as json or none
         """
+        if self.req_base_url is None:
+            return None
         retries = 0
         while retries <= self.http_timeout_retry_count:
             try:
@@ -194,7 +201,7 @@ class SC23DCI:
                 year=ret['time']['y'],
                 hour=ret['time']['h'],
                 minute=ret['time']['i']
-                )
+            )
             self.ip = ret['net']['ip']
             self.subnet = ret['net']['sub']
             self.gateway = ret['net']['gw']
@@ -300,7 +307,7 @@ class SC23DCI:
         """
         self.wifi = []
 
-    def get_ssids(self):
+    def get_ssids(self) -> Optional[list[Wifi]]:
         """
         API Getter for the Wi-Fi SSIDs
         :return: The List of SSIDs or None
@@ -314,7 +321,7 @@ class SC23DCI:
                 self.wifi.append(Wifi(wifi))
         return self.wifi
 
-    def scan_ssids(self):
+    def scan_ssids(self) -> list[Wifi]:
         """
         Scans Wi-Fi SSIDs using the API
         :return:
@@ -330,16 +337,16 @@ class SC23DCI:
         Sends Power on request to the API
         """
         self.add_backlog(self.switch_on, None, 'ps', 1)
-        ret = self.http_post('power/on')
+        self.http_post('power/on')
 
     def switch_off(self):
         """
         Sends Power off request to the API
         """
         self.add_backlog(self.switch_off, None, 'ps', 0)
-        ret = self.http_post('power/off')
+        self.http_post('power/off')
 
-    def set_temperature(self, set_point):
+    def set_temperature(self, set_point: float | int):
         """
         Sends temperature set point request to the API
         :param set_point: The target temperature in °C
@@ -348,51 +355,51 @@ class SC23DCI:
             max(
                 min(
                     set_point,
-                    Env.get_env('SC23DCI_MAX_TEMP_C')
+                    float(Env.get_env('SC23DCI_MAX_TEMP_C'))
                 ),
-                Env.get_env('SC23DCI_MIN_TEMP_C')
+                float(Env.get_env('SC23DCI_MIN_TEMP_C'))
             )
         )
         self.add_backlog(self.set_temperature, set_point, 'sp', set_point)
-        ret = self.http_post('set/setpoint', {'p_temp': set_point})
+        self.http_post('set/setpoint', {'p_temp': set_point})
 
-    def set_fan_speed(self, speed):
+    def set_fan_speed(self, speed: int):
         """
         Sends fan speed request to the API
         :param speed: The fanspeed auto:0, speed: 1-3
         """
         speed = max(min(speed, 3), 0)
         self.add_backlog(self.set_fan_speed, speed, 'fs', speed)
-        ret = self.http_post('set/fan', {'value': speed})
+        self.http_post('set/fan', {'value': speed})
 
-    def set_flap_rotation(self, rotate):
+    def set_flap_rotation(self, rotate: int):
         """
         Sends flap rotation request to the API
         :param rotate: Rotate: 0, fixed: 7
         """
         mode = 0 if rotate else 7
         self.add_backlog(self.set_flap_rotation, rotate, 'fr', mode)
-        ret = self.http_post('set/feature/rotation', {'value': mode})
+        self.http_post('set/feature/rotation', {'value': mode})
 
-    def set_night_mode(self, night):
+    def set_night_mode(self, night: int):
         """
         Sends night mode request to the API
         :param night: Nightmode true: on, false: off
         """
         mode = 1 if night else 0
         self.add_backlog(self.set_night_mode, night, 'nm', mode)
-        ret = self.http_post('set/feature/night', {'value': mode})
+        self.http_post('set/feature/night', {'value': mode})
 
-    def set_timeplan_mode(self, mode):
+    def set_timeplan_mode(self, mode: int):
         """
         Sends timeplan mode request to the API
         :param mode: Timeplan mode true: on, false: off
         """
         endpoint = 'on' if mode else 'off'
         self.add_backlog(self.set_timeplan_mode, mode, 'cm', (1 if mode else 0))
-        ret = self.http_post('set/calendar/' + endpoint)
+        self.http_post('set/calendar/' + endpoint)
 
-    def set_working_mode(self, mode):
+    def set_working_mode(self, mode: int):
         """
         Sends working mode request to the API
         :param mode: the target working mode.
@@ -408,7 +415,7 @@ class SC23DCI:
         if self.power_state == 0:
             self.switch_on()
         self.add_backlog(self.set_working_mode, mode, 'wm', mode)
-        ret = self.http_post('set/mode/' + endpoint[mode])
+        self.http_post('set/mode/' + endpoint[mode])
 
     def set_mode_auto(self):
         """
@@ -506,9 +513,10 @@ class SC23DCI:
         """
         logger.info(f"MQTT disconnected with result code {rc}")
 
-    def set_mqtt_client(self, broker, port):
+    def set_mqtt_client(self, broker: str, port: str | int):
         """
         Sets up the MQTT client
+        :param port: the port of the broker
         :param broker: the ip or hostname
         """
         self.mqtt_client = mqtt.Client()
@@ -516,11 +524,10 @@ class SC23DCI:
         self.mqtt_client.on_connect = self.mqtt_on_connect
         self.mqtt_client.on_disconnect = self.mqtt_on_disconnect
         self.mqtt_client.will_set(Env.get_env('MQTT_TOPIC_LWT'), payload='offline', retain=True)
-        self.mqtt_client.connect(broker, port)
+        self.mqtt_client.connect(broker, int(port))
         self.mqtt_client.loop_start()
 
-
-    def mqtt_enable_publish(self, topic, _id):
+    def mqtt_enable_publish(self, topic: str, _id: str):
         """
         Enables publishing for topic
         :param topic: The topic to enable publish on
@@ -536,7 +543,7 @@ class SC23DCI:
                     self.mqtt_list.remove(pub)
         self.mqtt_list.append(new_pub)
 
-    def mqtt_disable_publish(self, topic, _id):
+    def mqtt_disable_publish(self, topic: str, _id: str):
         """
         Disables publishing for topic
         :param topic: The topic to disable publish on
@@ -548,21 +555,21 @@ class SC23DCI:
         }
         self.mqtt_list.remove(pub)
 
-    def mqtt_enable_publish_temperature(self, topic):
+    def mqtt_enable_publish_temperature(self, topic: str):
         """
         Enables publishing of the temperature sensor
         :param topic: The topic to enable publish on
         """
         self.mqtt_enable_publish(topic, 'temperature')
 
-    def mqtt_enable_publish_power_state(self, topic):
+    def mqtt_enable_publish_power_state(self, topic: str):
         """
         Enables publishing of the power state
         :param topic: The topic to enable publish on
         """
         self.mqtt_enable_publish(topic, 'powerstate')
 
-    def mqtt_enable_publish_all(self, topic):
+    def mqtt_enable_publish_all(self, topic: str):
         """
         Enables publishing of the summary
         :param topic: The topic to enable publish on
@@ -579,6 +586,7 @@ class SC23DCI:
                         self.mqtt_home_assistant_autodiscover()
                 except (ValueError, TypeError) as e:
                     logger.error(e)
+
             self.mqtt_subscribe(
                 'homeassistant/status',
                 home_assistant_autodiscover_wrapper
@@ -605,14 +613,15 @@ class SC23DCI:
             self.on_mqtt_fan_speed
         )
 
-    def mqtt_subscribe(self, topic, cb):
+    def mqtt_subscribe(self, topic: str, cb):
         """
         Enables subscribing to the topic and sets the callback
         :param topic: The topic to subscribe to
         :param cb: The callback function -> (client, userdata, msg)
         """
-        self.mqtt_client.subscribe(topic)
-        self.mqtt_client.message_callback_add(topic, cb)
+        if self.mqtt_client is not None:
+            self.mqtt_client.subscribe(topic)
+            self.mqtt_client.message_callback_add(topic, cb)
 
     def on_mqtt_flap_mode(self, client, userdata, msg):
         """
@@ -630,6 +639,7 @@ class SC23DCI:
         elif target_mode == 'on':
             target_mode = 0
         self.set_flap_rotation(target_mode)
+
     def on_mqtt_fan_speed(self, client, userdata, msg):
         """
         The callback of the fan speed setter subscribe
@@ -651,6 +661,7 @@ class SC23DCI:
             case 'high':
                 target_speed = 3
         self.set_fan_speed(target_speed)
+
     def on_mqtt_power_state(self, client, userdata, msg):
         """
         The callback of the power state setter subscribe
@@ -710,9 +721,9 @@ class SC23DCI:
         if not Env.get_env('MQTT_HASSIO_AUTODETECT'):
             return
         discovery_prefix = Env.get_env('MQTT_HASSIO_TOPIC')
-        component='climate'
-        object_id=Env.get_env('MQTT_HASSIO_OBJECT_ID')
-        config={
+        component = 'climate'
+        object_id = Env.get_env('MQTT_HASSIO_OBJECT_ID')
+        config = {
             'name': 'SC23DCI',
             'unique_id': object_id,
             'modes': ['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'],
@@ -733,9 +744,9 @@ class SC23DCI:
                                    "}}",
             'swing_mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
             'swing_mode_state_template': "{{"
-                                   " ['on', '', '', '', '', '', '', 'off'][value_json.flap_rotate|int]"
-                                       " if value_json.flap_rotate|int in [0, 7] else value "
-                                   "}}",
+                                         " ['on', '', '', '', '', '', '', 'off'][value_json.flap_rotate|int]"
+                                         " if value_json.flap_rotate|int in [0, 7] else value "
+                                         "}}",
             'swing_mode_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
             'swing_mode_command_template': "{{ value }}",
             'fan_mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),

@@ -5,7 +5,7 @@ Starts up the agent
 import datetime
 import sys
 
-from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.schedulers.blocking import BlockingScheduler  # type: ignore
 from loguru import logger
 
 from env.env import Env
