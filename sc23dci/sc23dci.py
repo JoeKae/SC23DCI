@@ -8,13 +8,11 @@ from datetime import datetime
 from time import sleep
 from typing import Optional
 
-import paho.mqtt.client
-
-from env.env import Env
-
 import paho.mqtt.client as mqtt
 import requests as req
 from loguru import logger
+
+from env.env import Env
 
 
 class ApiError(Exception):
@@ -33,7 +31,7 @@ class Wifi:
     """
     Represents Wi-Fi config of the SC23DCI device
     """
-    essid:str = ""
+    essid: str = ""
     signal: int = 0
     password: bool = True
 
@@ -51,11 +49,12 @@ class Wifi:
         return f"(SSID: {self.essid}, Signal: {self.signal}, Password: {self.password})"
 
 
+# pylint: disable=too-many-instance-attributes, too-many-public-methods
 class SC23DCI:
     """
     Handles all the SC23DCI API polling and MQTT sub/pub
     """
-    mqtt_client: paho.mqtt.client.Client | None = None
+    mqtt_client: mqtt.Client | None = None
     mqtt_list: list[dict] = []
     req_base_url: str | None = None
     set_point: str | None = None
@@ -142,7 +141,7 @@ class SC23DCI:
                     # something went wrong.
                     raise ApiError(f"GET {endpoint} {res.status_code}")
                 return res.json()
-            except:
+            except:  # pylint: disable=bare-except
                 logger.debug(f"Timeout on {self.req_base_url}{endpoint}")
                 time.sleep(1)
                 retries += 1
@@ -176,7 +175,7 @@ class SC23DCI:
                     raise ApiError(f"POST {endpoint} {res.status_code}")
                 # logger.debug("status: {}, response: {}", res.status_code, res.json())
                 return res.json()
-            except:
+            except:  # pylint: disable=bare-except
                 logger.debug(
                     f"Timeout on POST {self.req_base_url}{endpoint}, data: {data}"
                 )
@@ -184,7 +183,7 @@ class SC23DCI:
         logger.debug(f"Missed all timeout retries {self.req_base_url}{endpoint}, data: {data}")
         return None
 
-    def refresh(self):
+    def refresh(self):   # pylint: disable=too-many-statements
         """
         Polls new data from the device and updates this instance
         """
@@ -327,7 +326,7 @@ class SC23DCI:
         :return:
         """
         self.clear_ssids()
-        for i in range(5):
+        for i in range(5):  # pylint: disable=unused-variable
             self.get_ssids()
             sleep(1)
         return self.wifi
@@ -488,7 +487,7 @@ class SC23DCI:
                 }
                 self.mqtt_client.publish(pub['topic'], payload=json.dumps(all_payload))
 
-    def mqtt_on_connect(self, client, userdata, flags, rc):
+    def mqtt_on_connect(self, client, userdata, flags, rc):  # pylint: disable=unused-argument
         """
         MQTT on connect callback
         :param client:
@@ -502,7 +501,7 @@ class SC23DCI:
         self.mqtt_client.publish(Env.get_env('MQTT_TOPIC_LWT'), payload='online', retain=True)
         self.mqtt_home_assistant_autodiscover()
 
-    def mqtt_on_disconnect(self, client, userdata, flags, rc):
+    def mqtt_on_disconnect(self, client, userdata, flags, rc):  # pylint: disable=unused-argument
         """
         MQTT on disconnect callback
         :param client:
@@ -577,8 +576,11 @@ class SC23DCI:
         self.mqtt_enable_publish(topic, 'all')
 
     def mqtt_subscribe_to_all_topics(self):
+        """
+        Wrapper to bundle all subscribe calls into one function
+        """
         if Env.get_env('MQTT_HASSIO_AUTODETECT'):
-            def home_assistant_autodiscover_wrapper(client, userdata, msg):
+            def home_assistant_autodiscover_wrapper(client, userdata, msg):  # pylint: disable=unused-argument
                 status = 'offline'
                 try:
                     status = msg.payload.decode('utf-8')
@@ -623,7 +625,7 @@ class SC23DCI:
             self.mqtt_client.subscribe(topic)
             self.mqtt_client.message_callback_add(topic, cb)
 
-    def on_mqtt_flap_mode(self, client, userdata, msg):
+    def on_mqtt_flap_mode(self, client, userdata, msg):  # pylint: disable=unused-argument
         """
         The callback of the flap mode setter subscribe
         :param client: The MQTT client
@@ -640,7 +642,7 @@ class SC23DCI:
             target_mode = 0
         self.set_flap_rotation(target_mode)
 
-    def on_mqtt_fan_speed(self, client, userdata, msg):
+    def on_mqtt_fan_speed(self, client, userdata, msg):  # pylint: disable=unused-argument
         """
         The callback of the fan speed setter subscribe
         :param client: The MQTT client
@@ -662,7 +664,7 @@ class SC23DCI:
                 target_speed = 3
         self.set_fan_speed(target_speed)
 
-    def on_mqtt_power_state(self, client, userdata, msg):
+    def on_mqtt_power_state(self, client, userdata, msg):  # pylint: disable=unused-argument
         """
         The callback of the power state setter subscribe
         :param client: The MQTT client
@@ -683,7 +685,7 @@ class SC23DCI:
         else:
             self.switch_on()
 
-    def on_mqtt_mode(self, client, userdata, msg):
+    def on_mqtt_mode(self, client, userdata, msg):  # pylint: disable=unused-argument
         """
         The callback of the working mode setter subscribe
         :param client: The MQTT client
@@ -695,14 +697,14 @@ class SC23DCI:
         except (ValueError, TypeError):
             mode = msg.payload.decode('utf-8')
 
-        if mode == 'off' or mode == 6:
+        if mode in ['off', 6]:
             self.switch_off()
             return
         endpoint = ['heating', 'cooling', '', 'dehumidification', 'fanonly', 'auto']
         if mode in endpoint:
             self.set_working_mode(endpoint.index(mode))
 
-    def on_mqtt_setpoint(self, client, userdata, msg):
+    def on_mqtt_setpoint(self, client, userdata, msg):  # pylint: disable=unused-argument
         """
         The callback of the temperature set point setter subscribe
         :param client: The MQTT client
@@ -733,26 +735,34 @@ class SC23DCI:
             'availability_topic': Env.get_env('MQTT_TOPIC_LWT'),
             'mode_command_topic': Env.get_env('MQTT_TOPIC_MODE_SET'),
             'mode_command_template': "{{"
-                                     " ['heating', 'cooling', 'dehumidification', 'fanonly', 'auto', 'off']"
-                                     "[['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'].index(value)]"
-                                     " if value in ['heat', 'cool', 'dry', 'fan_only', 'auto', 'off'] else value "
+                                     " ['heating', 'cooling', 'dehumidification', "
+                                     "'fanonly', 'auto', 'off']"
+                                     "[['heat', 'cool', 'dry', 'fan_only', 'auto', "
+                                     "'off'].index(value)]"
+                                     " if value in ['heat', 'cool', 'dry', 'fan_only', "
+                                     "'auto', 'off'] else value "
                                      "}}",
             'mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
             'mode_state_template': "{{"
-                                   " ['heat', 'cool', '', 'dry', 'fan_only', 'auto', 'off']"
-                                   "[value_json.mode|int] if value_json.mode|int in [0, 1, 3, 4, 5, 6] else value "
+                                   " ['heat', 'cool', '', 'dry', 'fan_only', "
+                                   "'auto', 'off']"
+                                   "[value_json.mode|int] if value_json.mode|int in "
+                                   "[0, 1, 3, 4, 5, 6] else value "
                                    "}}",
             'swing_mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
             'swing_mode_state_template': "{{"
-                                         " ['on', '', '', '', '', '', '', 'off'][value_json.flap_rotate|int]"
+                                         " ['on', '', '', '', '', '', '', 'off']"
+                                         "[value_json.flap_rotate|int]"
                                          " if value_json.flap_rotate|int in [0, 7] else value "
                                          "}}",
             'swing_mode_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
             'swing_mode_command_template': "{{ value }}",
             'fan_mode_state_topic': Env.get_env('MQTT_TOPIC_ALL'),
             'fan_mode_state_template': "{{"
-                                       " ['auto', 'low', 'medium', 'high'][value_json.fan_speed|int]"
-                                       " if value_json.fan_speed|int in [0, 1, 2, 3] else value "
+                                       " ['auto', 'low', 'medium', 'high']"
+                                       "[value_json.fan_speed|int]"
+                                       " if value_json.fan_speed|int in "
+                                       "[0, 1, 2, 3] else value "
                                        "}}",
             'fan_mode_command_topic': Env.get_env('MQTT_TOPIC_SETPOINT_SET'),
             'fan_mode_command_template': "{{ value }}",
