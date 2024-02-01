@@ -3,7 +3,7 @@ Environment variable Module
 Grants read access to valid environment variable
 """
 import os
-from typing import Optional
+
 from loguru import logger
 
 
@@ -53,16 +53,15 @@ class Env:
         env_value = os.getenv(key)
         if env_value is not None:
             return env_value
-        elif key in Env.optional_keys:
+        if key in Env.optional_keys:
             return str(Env.optional_keys[key])
-        else:
-            raise KeyError('Invalid env key requested')
+        raise KeyError('Invalid env key requested')
 
     @staticmethod
     def check_missing():
         """
         Checks for missing environment variables
-        :raises Exception: Missing environment variables
+        :raises KeyError: Missing environment variables
         :return: A list of missing variable names
         """
         missing_envs = []
@@ -73,4 +72,4 @@ class Env:
         for env in missing_envs:
             logger.error(f"Environment variable {env} is missing or invalid")
         if len(missing_envs) > 0:
-            raise Exception('Missing environment variables')
+            raise KeyError('Missing environment variables')
