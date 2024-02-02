@@ -49,6 +49,8 @@ Setup your Wi-Fi in your A/C unit using [this app](https://play.google.com/store
   - Default: `sc23dci/fan_speed`
 - `MQTT_TOPIC_FAN_SPEED_SET`: The topic to subscribe for fan speed commands.
   - Default: `sc23dci/fan_speed/set`
+- `MQTT_TOPIC_NIGHT_MODE_SET`: The topic to subscribe for night mode commands.
+  - Default: `sc23dci/night_mode/set`
 - `MQTT_TOPIC_LWT`: The topic to publish the Last Will and Testament (LWT) message.
   - Default: `sc23dci/lwt`
 - `MQTT_HASSIO_AUTODETECT`: Enable or disable Zeroconf Home Assistant autodetect.
@@ -63,6 +65,9 @@ Setup your Wi-Fi in your A/C unit using [this app](https://play.google.com/store
   - Default: `16`
 - `SC23DCI_POLL_INTERVAL`: Interval in seconds to poll data from the AC.
     - Default: `10`
+- `LOG_LEVEL`: Minimum logging level/verbosity: 
+    - `TRACE, DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL`
+    - Default: `INFO` 
 </details>
 
 ### 2. Run `docker-compose up` or `docker-compose up -d`.
@@ -153,5 +158,18 @@ If the configured topic is `sc23dci/flap_mode/set`, publish the payload `0` or `
 Flap states:
 - `0: on`
 - `7: off`
+
+</details>
+
+<details>
+<summary><strong>Set night mode</strong></summary>
+
+- eg. enable night mode
+
+If the configured topic is `sc23dci/night_mode/set`, publish the payload `1` or `on` to `sc23dci/night_mode/set`.
+
+Flap states:
+- `0: off`
+- `1: on`
 
 </details>
