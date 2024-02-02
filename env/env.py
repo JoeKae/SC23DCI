@@ -30,13 +30,15 @@ class Env:
         'MQTT_TOPIC_FLAP_MODE_SET': 'sc23dci/flap_mode/set',
         'MQTT_TOPIC_FAN_SPEED': 'sc23dci/fan_speed',
         'MQTT_TOPIC_FAN_SPEED_SET': 'sc23dci/fan_speed/set',
+        'MQTT_TOPIC_NIGHT_MODE_SET': 'sc23dci/night_mode/set',
         'MQTT_TOPIC_LWT': 'sc23dci/lwt',
         'MQTT_HASSIO_AUTODETECT': True,
         'MQTT_HASSIO_OBJECT_ID': 'SC23DCI-unique-id-not-set',
         'MQTT_HASSIO_TOPIC': 'homeassistant',
         'SC23DCI_MAX_TEMP_C': 31,
         'SC23DCI_MIN_TEMP_C': 16,
-        'SC23DCI_POLL_INTERVAL': 10
+        'SC23DCI_POLL_INTERVAL': 10,
+        'LOG_LEVEL': 'INFO'
     }
 
     @staticmethod

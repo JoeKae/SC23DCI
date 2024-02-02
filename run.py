@@ -11,11 +11,28 @@ from loguru import logger
 from env.env import Env
 from sc23dci import sc23dci
 
-if __name__ == '__main__':
+
+def set_log_level(level):
+    """
+    Sets the logger to the given verbosity
+    :param level: The verbosity
+    - TRACE
+    - DEBUG
+    - INFO
+    - SUCCESS
+    - WARNING
+    - ERROR
+    - CRITICAL
+    """
+    if level not in ['TRACE', 'DEBUG', 'INFO', 'SUCCESS', 'WARNING', 'ERROR', 'CRITICAL']:
+        level = 'INFO'
     logger.remove()
     logger.add("/var/log/sc23dci.log", rotation="500 KB", level="INFO")
-    logger.add(sys.stderr, level="INFO")
+    logger.add(sys.stderr, level=level)
 
+
+if __name__ == '__main__':
+    set_log_level(Env.get_env('LOG_LEVEL'))
     Env.check_missing()
 
     logger.info('Creating SC23DCI instance')
