@@ -281,7 +281,7 @@ class SC23DCI:
 
             if self.mqtt_client != 0 and len(self.mqtt_list) > 0:
                 self.mqtt_publish()
-        # logger.debug(self)
+        logger.debug(self)
 
     def add_backlog(self, func, arg, key, value):
         """
@@ -383,11 +383,12 @@ class SC23DCI:
     def set_night_mode(self, night: int):
         """
         Sends night mode request to the API
-        :param night: Nightmode true: on, false: off
+        :param night: Night mode 1: on, 0: off
         """
-        mode = 1 if night else 0
-        self.add_backlog(self.set_night_mode, night, 'nm', mode)
-        self.http_post('set/feature/night', {'value': mode})
+        if night not in [0, 1]:
+            return
+        self.add_backlog(self.set_night_mode, night, 'nm', night)
+        self.http_post('set/feature/night', {'value': night})
 
     def set_timeplan_mode(self, mode: int):
         """
@@ -614,6 +615,10 @@ class SC23DCI:
             Env.get_env('MQTT_TOPIC_FAN_SPEED_SET'),
             self.on_mqtt_fan_speed
         )
+        self.mqtt_subscribe(
+            Env.get_env('MQTT_TOPIC_NIGHT_MODE_SET'),
+            self.on_mqtt_night_mode
+        )
 
     def mqtt_subscribe(self, topic: str, cb):
         """
@@ -641,6 +646,23 @@ class SC23DCI:
         elif target_mode == 'on':
             target_mode = 0
         self.set_flap_rotation(target_mode)
+
+    def on_mqtt_night_mode(self, client, userdata, msg):  # pylint: disable=unused-argument
+        """
+        The callback of the night mode setter subscribe
+        :param client: The MQTT client
+        :param userdata:
+        :param msg: The message with payload
+        """
+        try:
+            target_mode = int(float(msg.payload))
+        except (ValueError, TypeError):
+            target_mode = msg.payload.decode('utf-8')
+        if target_mode == 'off':
+            target_mode = 0
+        elif target_mode == 'on':
+            target_mode = 1
+        self.set_night_mode(target_mode)
 
     def on_mqtt_fan_speed(self, client, userdata, msg):  # pylint: disable=unused-argument
         """
