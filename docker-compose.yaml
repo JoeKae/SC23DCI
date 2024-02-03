@@ -6,6 +6,6 @@ services:
     container_name: sc23dci
     restart: always
 #    build: ./
-    image: cheerio123/sc23dci:v1.0
+    image: cheerio123/sc23dci:v1.1
     env_file: .env.file
 
