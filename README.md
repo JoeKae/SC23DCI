@@ -1,26 +1,63 @@
-# SC23DCI
+# Project Introduction
 
-## About this Project
-Lorem Ipsum
+This project aims to provide an agent that exposes REST API endpoints of an 
+HVAC (Heating, Ventilation, and Air Conditioning) device via MQTT (Message Queuing Telemetry Transport). 
+In addition, it is designed to seamlessly integrate into Home Assistant by 
+utilizing the MQTT autodetect feature of Home Assistant.
 
-## Docker image
-[Image on hub.docker.com][3]
+## SC23DCI
 
-## Compatible devices
-Lorem Ipsum
+### Overview
 
-### First indicator: the display
-Lorem Ipsum
+The HVAC device agent serves as a bridge between compatible HVAC systems and modern home automation platforms 
+like Home Assistant. By leveraging MQTT, the agent facilitates communication between the compatible HVAC device 
+and other smart home devices or applications that support MQTT.
+
+### Features
+
+- Exposes REST API endpoints for controlling compatible HVAC device settings via MQTT.
+- Communicates with the compatible HVAC device via REST API.
+- Integrates seamlessly with Home Assistant using MQTT autodetect feature.
+- Supports various HVAC functionalities including temperature control, mode settings, and fan speed adjustment.
+- Easy to configure and deploy in different home automation setups.
+
+### Reverse-Engineered REST API
+
+The REST API utilized by the SC23DCI agent has been reverse-engineered to enable seamless communication with 
+compatible HVAC devices. The current state of the reverse-engineered REST API is documented in detail [here][6]
+
+This documentation provides insights into the endpoints, parameters, and functionalities provided by the REST API. 
+It serves as a reference for developers looking to integrate additional features or extend the capabilities
+of the SC23DCI agent.
+
+Feel free to explore the documented REST API to gain a deeper understanding of how the SC23DCI agent communicates
+with compatible HVAC devices.
+
+
+### Docker Image
+
+For easy deployment, you can pull the Docker image from [hub.docker.com][3]
+
+## Compatible Device Identification Guide
+
+Works with Devices like the [FRICO SOLOCLIM DE][1]
+
+To ensure compatibility with the SC23DCI agent, look for the following indicators:
+
+1. **Display Appearance**: The display of the HVAC device should resemble the example provided.
+2. **ESP-01S Module**: Remove the front panel and check the right side of the display PCB (Printed Circuit Board). 
+  If an ESP-01S module is mounted next to the display, it indicates that the device is equipped with WiFi 
+  functionality and provides the necessary REST API for communication.
+
+### Example Display:
 
 <a href="docs/images/display_closeup.jpg">
   <img src="docs/images/display_closeup.jpg" style="width: 720px" alt="display closeup">
 </a>
 
 ### The WiFi chip: ESP-01S
-Lorem Ipsum
-Open the front panel
 <table>
-  <th>HVAC without fron panel</th><th>ESP chip</th>
+  <th>HVAC without front panel</th><th>ESP chip</th>
   <tr>
     <td>
       <a href="docs/images/front_full.jpg">
@@ -35,32 +72,33 @@ Open the front panel
   </tr>
 </table>
 
-
-Investigate the PCB of the Display to see if there is a ESP-01S
-
-
-
-SC23DCI HVAC MQTT agent
-Works with Devices like this one: [FRICO SOLOCLIM DE][1]
-
-
-## Setup AC
+## Setup HVAC
 
 ### 1. Activate Wi-Fi
 
-While the A/C is running, long press the power icon on the display. After a few seconds you can cycle through `[on, rst, off]` by tapping the power icon. This sets Wi-Fi on/off or resets the WiFi-Config. When the display shows the desired value, wait a few seconds and the setting is saved.
+While the A/C is running, long press the power icon on the display. After a few seconds you can cycle 
+through `[on, rst, off]` by tapping the power icon. This sets Wi-Fi on/off or resets the WiFi-Config. 
+When the display shows the desired value, wait a few seconds and the setting is saved.
 
-Entering this menu can be a bit tedious because the A/C tends to just turn off when the power icon is pressed. You can try this: Turn the A/C off, then double tap the power icon and do not lift your finger on the second tap. I think it takes ~5 seconds until the menu appears.
+:warning: Entering this menu can be a bit tedious because the HVAC tends to just turn off when the power icon is pressed. 
+Try this: Turn the HVAC off, then double tap the power icon and do not lift your finger on the second tap. 
+I think it takes ~5 seconds until the menu appears.
 
 <a href="docs/videos/setup_wifi.gif">
 <img src="docs/videos/setup_wifi.gif" style="width: 720px" alt="hvac wifi setup">
 </a>
 
-If you were successful, the A/C will create a WLAN, through which it can be configured using the [app][2] and can be integrated into your WLAN.
+If you were successful, the A/C will create a WLAN, through which it can be configured using the [app][2] 
+and can be integrated into your WLAN.
 
 ### 2. Setup Wi-Fi
 
 Setup your Wi-Fi in your A/C unit using [this app][2].
+
+:warning: The device will not work with special characters in your SSID or in the password so stick to 
+a...z, A...Z and 0...9 to avoid trouble.
+The device will not connect otherwise, and you will have to [reset the
+WiFi-Config](#1-activate-wi-fi).
 
 ## Setting up MQTT-Agent
 
@@ -123,9 +161,9 @@ Setup your Wi-Fi in your A/C unit using [this app][2].
 <details>
 <summary><strong>Home Assistant</strong></summary>
 
-| Home Assistant climate | Home Assistant climate detail |
-| --------------------------------------------------------- | ------------------------------------------------------------------------ |
-| ![Home Assistant climate](docs/images/hassio_climate.png) | ![Home Assistant climate details](docs/images/hassio_climate_detail.png) |
+| Home Assistant climate       | Home Assistant climate detail        |
+|------------------------------|--------------------------------------|
+| ![Home Assistant climate][4] | ![Home Assistant climate details][5] |
 
 
 
@@ -223,3 +261,6 @@ Flap states:
 [1]: https://www.frico.net/fileadmin/user_upload/frico/Pdf/cat_frico_soloclim_de.pdf
 [2]: https://play.google.com/store/apps/details?id=it.kumbe.innovapp20
 [3]: https://hub.docker.com/r/cheerio123/sc23dci
+[4]: docs/images/hassio_climate.png
+[5]: docs/images/hassio_climate_detail.png
+[6]: docs/hvac-rest-api/README.md
