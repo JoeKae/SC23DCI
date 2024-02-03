@@ -1,6 +1,25 @@
 # SC23DCI
-SC23DCI AC MQTT agent
-Works with Devices like this one: [FRICO SOLOCLIM DE](https://www.frico.net/fileadmin/user_upload/frico/Pdf/cat_frico_soloclim_de.pdf)
+
+## About this Project
+Lorem Ipsum
+
+## Compatible devices
+Lorem Ipsum
+
+### First indicator: the display
+Lorem Ipsum
+![hvac_display](docs/images/display_closup.jpg)
+
+### The WiFi chip: ESP-01S
+Lorem Ipsum
+Open the front panel
+![hvac_without_front_panel](docs/images/front_full.jpg)
+Investigate the PCB of the Display to see if there is a ESP-01S
+![esp_closeup](docs/images/esp_closeup.jpg)
+
+SC23DCI HVAC MQTT agent
+Works with Devices like this one: [FRICO SOLOCLIM DE][1]
+
 
 ## Setup AC
 
@@ -10,11 +29,13 @@ While the A/C is running, long press the power icon on the display. After a few 
 
 Entering this menu can be a bit tedious because the A/C tends to just turn off when the power icon is pressed. You can try this: Turn the A/C off, then double tap the power icon and do not lift your finger on the second tap. I think it takes ~5 seconds until the menu appears.
 
-If you were successful, the A/C will create a WLAN, through which it can be configured using the [app](https://play.google.com/store/apps/details?id=it.kumbe.innovapp20) and can be integrated into your WLAN.
+![hvac_wifi_setup](docs/videos/setup_wifi.gif)
+
+If you were successful, the A/C will create a WLAN, through which it can be configured using the [app][2] and can be integrated into your WLAN.
 
 ### 2. Setup Wi-Fi
 
-Setup your Wi-Fi in your A/C unit using [this app](https://play.google.com/store/apps/details?id=it.kumbe.innovapp20).
+Setup your Wi-Fi in your A/C unit using [this app][2].
 
 ## Setting up MQTT-Agent
 
@@ -173,3 +194,6 @@ Flap states:
 - `1: on`
 
 </details>
+
+[1]: https://www.frico.net/fileadmin/user_upload/frico/Pdf/cat_frico_soloclim_de.pdf
+[2]: https://play.google.com/store/apps/details?id=it.kumbe.innovapp20
