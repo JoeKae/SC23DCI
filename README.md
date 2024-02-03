@@ -3,19 +3,42 @@
 ## About this Project
 Lorem Ipsum
 
+## Docker image
+[Image on hub.docker.com][3]
+
 ## Compatible devices
 Lorem Ipsum
 
 ### First indicator: the display
 Lorem Ipsum
-![hvac_display](docs/images/display_closup.jpg)
+
+<a href="docs/images/display_closeup.jpg">
+  <img src="docs/images/display_closeup.jpg" style="width: 720px" alt="display closeup">
+</a>
 
 ### The WiFi chip: ESP-01S
 Lorem Ipsum
 Open the front panel
-![hvac_without_front_panel](docs/images/front_full.jpg)
+<table>
+  <th>HVAC without fron panel</th><th>ESP chip</th>
+  <tr>
+    <td>
+      <a href="docs/images/front_full.jpg">
+        <img src="docs/images/front_full.jpg" style="width: 720px" alt="hvac without front panel">
+      </a>
+    </td>
+    <td>
+      <a href="docs/images/esp_closeup.jpg">
+        <img src="docs/images/esp_closeup.jpg" style="width: 303px" alt="esp closeup">
+      </a>
+    </td>
+  </tr>
+</table>
+
+
 Investigate the PCB of the Display to see if there is a ESP-01S
-![esp_closeup](docs/images/esp_closeup.jpg)
+
+
 
 SC23DCI HVAC MQTT agent
 Works with Devices like this one: [FRICO SOLOCLIM DE][1]
@@ -29,7 +52,9 @@ While the A/C is running, long press the power icon on the display. After a few 
 
 Entering this menu can be a bit tedious because the A/C tends to just turn off when the power icon is pressed. You can try this: Turn the A/C off, then double tap the power icon and do not lift your finger on the second tap. I think it takes ~5 seconds until the menu appears.
 
-![hvac_wifi_setup](docs/videos/setup_wifi.gif)
+<a href="docs/videos/setup_wifi.gif">
+<img src="docs/videos/setup_wifi.gif" style="width: 720px" alt="hvac wifi setup">
+</a>
 
 If you were successful, the A/C will create a WLAN, through which it can be configured using the [app][2] and can be integrated into your WLAN.
 
@@ -197,3 +222,4 @@ Flap states:
 
 [1]: https://www.frico.net/fileadmin/user_upload/frico/Pdf/cat_frico_soloclim_de.pdf
 [2]: https://play.google.com/store/apps/details?id=it.kumbe.innovapp20
+[3]: https://hub.docker.com/r/cheerio123/sc23dci
